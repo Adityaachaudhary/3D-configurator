@@ -163,11 +163,10 @@ function splitSofaGeometry(source: THREE.BufferGeometry) {
     const indices = [0, 1, 2].map((corner) =>
       sourceIndex ? sourceIndex.getX(triangle * 3 + corner) : triangle * 3 + corner,
     );
-    const root = find(indices[0] ?? 0);
-    const componentHeight = (componentMaxY[root] ?? 0) - (componentMinY[root] ?? 0);
-    const componentWidth = (componentMaxX[root] ?? 0) - (componentMinX[root] ?? 0);
-    const componentDepth = (componentMaxZ[root] ?? 0) - (componentMinZ[root] ?? 0);
-    const isLeg = (componentMaxY[root] ?? 1) < -0.16 && componentHeight < 0.3 && componentWidth < 0.35 && componentDepth < 0.35;
+    const centerX = indices.reduce((sum, index) => sum + position.getX(index), 0) / 3;
+    const centerY = indices.reduce((sum, index) => sum + position.getY(index), 0) / 3;
+    const centerZ = indices.reduce((sum, index) => sum + position.getZ(index), 0) / 3;
+    const isLeg = centerY < -0.275 && Math.abs(centerX) > 0.76 && Math.abs(centerZ) > 0.2;
     (isLeg ? legs : fabric).push(...indices);
   }
   geometry.setIndex([...fabric, ...legs]);
