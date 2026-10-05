@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import * as THREE from "three";
-import { createPortal } from "react-dom";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 import sofaAsset from "@/assets/Panache-OPAA.glb.asset.json";
@@ -431,19 +430,17 @@ function DimensionLabel({ axis, value, position }: { axis: string; value: string
   const { gl, camera, size } = useThree();
   const anchor = useRef<THREE.Group>(null);
   const label = useRef<HTMLSpanElement>(null);
-  const [target, setTarget] = useState<HTMLElement | null>(null);
   const projected = useMemo(() => new THREE.Vector3(), []);
-  useEffect(() => { setTarget(gl.domElement.parentElement); }, [gl]);
+  useEffect(() => { label.current = document.querySelector<HTMLSpanElement>(`[data-dimension="${axis}"]`); }, [axis, gl]);
   useFrame(() => {
     if (!anchor.current || !label.current) return;
+    label.current.textContent = value;
     anchor.current.updateWorldMatrix(true, false);
     anchor.current.getWorldPosition(projected).project(camera);
     label.current.style.transform = `translate(${(projected.x + 1) * size.width / 2}px, ${(1 - projected.y) * size.height / 2}px) translate(-50%, -50%)`;
     label.current.hidden = projected.z > 1 || projected.z < -1;
   });
-  return <group ref={anchor} position={position}>{target && createPortal(
-    <span ref={label} data-dimension={axis} className="pointer-events-none absolute left-0 top-0 z-10 whitespace-nowrap rounded-sm bg-dimension px-2 py-1 font-mono text-xs text-dimension-foreground">{value}</span>, target,
-  )}</group>;
+  return <group ref={anchor} position={position} />;
 }
 
 function Dimensions({ scale, unit, seats, reducedMotion }: { scale: number; unit: Unit; seats: SeatCount; reducedMotion: boolean }) {
@@ -611,7 +608,7 @@ export function SofaConfigurator() {
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
-      <div className="absolute inset-0 sm:right-[348px]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} /></div>
+      <div className="absolute inset-0 sm:right-[348px]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} />{measures && (["width", "height", "depth"] as const).map((axis) => <span key={axis} data-dimension={axis} className="pointer-events-none absolute left-0 top-0 z-10 whitespace-nowrap rounded-sm bg-dimension px-2 py-1 font-mono text-xs text-dimension-foreground" />)}</div>
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between border-b border-border/80 bg-surface/95 px-4 sm:px-6">
         <div className="pointer-events-auto flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground"><Box className="size-4" /></div>
