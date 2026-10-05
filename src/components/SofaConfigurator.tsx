@@ -1,12 +1,10 @@
 import { Canvas, useThree } from "@react-three/fiber";
 import {
   Environment,
-  Html,
   Lightformer,
   Line,
   OrbitControls,
   useGLTF,
-  useProgress,
 } from "@react-three/drei";
 import {
   Box,
@@ -107,25 +105,62 @@ function splitSofaGeometry(source: THREE.BufferGeometry) {
   const position = geometry.getAttribute("position");
   const sourceIndex = geometry.index;
   const triangleCount = sourceIndex ? sourceIndex.count / 3 : position.count / 3;
+  const parent = new Int32Array(position.count);
+  const componentMinY = new Float32Array(position.count);
+  const componentMaxY = new Float32Array(position.count);
+  const componentMinX = new Float32Array(position.count);
+  const componentMaxX = new Float32Array(position.count);
+  const componentMinZ = new Float32Array(position.count);
+  const componentMaxZ = new Float32Array(position.count);
+  for (let index = 0; index < position.count; index += 1) {
+    parent[index] = index;
+    componentMinY[index] = componentMaxY[index] = position.getY(index);
+    componentMinX[index] = componentMaxX[index] = position.getX(index);
+    componentMinZ[index] = componentMaxZ[index] = position.getZ(index);
+  }
+  const find = (index: number) => {
+    let root = index;
+    while (parent[root] !== root) root = parent[root] ?? root;
+    let cursor = index;
+    while (cursor !== root) {
+      const next = parent[cursor] ?? root;
+      parent[cursor] = root;
+      cursor = next;
+    }
+    return root;
+  };
+  const join = (a: number, b: number) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent[rootB] = rootA;
+  };
+  for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+    const a = sourceIndex ? sourceIndex.getX(triangle * 3) : triangle * 3;
+    const b = sourceIndex ? sourceIndex.getX(triangle * 3 + 1) : triangle * 3 + 1;
+    const c = sourceIndex ? sourceIndex.getX(triangle * 3 + 2) : triangle * 3 + 2;
+    join(a, b);
+    join(b, c);
+  }
+  for (let index = 0; index < position.count; index += 1) {
+    const root = find(index);
+    componentMinY[root] = Math.min(componentMinY[root] ?? Infinity, position.getY(index));
+    componentMaxY[root] = Math.max(componentMaxY[root] ?? -Infinity, position.getY(index));
+    componentMinX[root] = Math.min(componentMinX[root] ?? Infinity, position.getX(index));
+    componentMaxX[root] = Math.max(componentMaxX[root] ?? -Infinity, position.getX(index));
+    componentMinZ[root] = Math.min(componentMinZ[root] ?? Infinity, position.getZ(index));
+    componentMaxZ[root] = Math.max(componentMaxZ[root] ?? -Infinity, position.getZ(index));
+  }
   const fabric: number[] = [];
   const legs: number[] = [];
   for (let triangle = 0; triangle < triangleCount; triangle += 1) {
     const indices = [0, 1, 2].map((corner) =>
       sourceIndex ? sourceIndex.getX(triangle * 3 + corner) : triangle * 3 + corner,
     );
-    const center = indices.reduce(
-      (sum, index) => {
-        sum.x += position.getX(index);
-        sum.y += position.getY(index);
-        sum.z += position.getZ(index);
-        return sum;
-      },
-      { x: 0, y: 0, z: 0 },
-    );
-    center.x /= 3;
-    center.y /= 3;
-    center.z /= 3;
-    const isLeg = center.y < -0.245 && Math.abs(center.x) > 0.54 && Math.abs(center.z) > 0.17;
+    const root = find(indices[0] ?? 0);
+    const componentHeight = (componentMaxY[root] ?? 0) - (componentMinY[root] ?? 0);
+    const componentWidth = (componentMaxX[root] ?? 0) - (componentMinX[root] ?? 0);
+    const componentDepth = (componentMaxZ[root] ?? 0) - (componentMinZ[root] ?? 0);
+    const isLeg = (componentMaxY[root] ?? 1) < -0.16 && componentHeight < 0.3 && componentWidth < 0.35 && componentDepth < 0.35;
     (isLeg ? legs : fabric).push(...indices);
   }
   geometry.setIndex([...fabric, ...legs]);
@@ -184,45 +219,19 @@ function SofaModel({ fabric, leg, textureScale, scale }: { fabric: FabricId; leg
   );
 }
 
-function LoadingModel() {
-  const { progress } = useProgress();
-  return (
-    <Html center>
-      <div className="w-40 rounded-md border border-border bg-surface px-4 py-3 text-center shadow-panel">
-        <div className="text-xs font-semibold uppercase text-muted-foreground">Preparing sofa</div>
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
-          <div className="h-full bg-primary" style={{ width: `${Math.round(progress)}%` }} />
-        </div>
-        <div className="mt-2 font-mono text-xs text-foreground">{Math.round(progress)}%</div>
-      </div>
-    </Html>
-  );
-}
-
 function Dimensions({ scale, unit }: { scale: number; unit: Unit }) {
   const width = BASE_SIZE.width * scale;
   const height = BASE_SIZE.height * scale;
   const depth = BASE_SIZE.depth * scale;
   const y = 0.08;
-  const format = (meters: number) => {
-    const factor = unit === "cm" ? 100 : unit === "mm" ? 1000 : 39.3701;
-    return `${Math.round(meters * factor)} ${unit}`;
-  };
-  const Label = ({ position, children }: { position: [number, number, number]; children: string }) => (
-    <Html position={position} center distanceFactor={6}>
-      <span className="whitespace-nowrap rounded-sm bg-dimension px-2 py-1 font-mono text-[10px] font-semibold text-dimension-foreground shadow-sm">{children}</span>
-    </Html>
-  );
+  void unit;
   return (
     <group>
       <Line points={[[-width / 2, y, depth / 2 + 0.25], [width / 2, y, depth / 2 + 0.25]]} color="#263126" lineWidth={1} />
       <Line points={[[-width / 2, y - 0.06, depth / 2 + 0.25], [-width / 2, y + 0.06, depth / 2 + 0.25]]} color="#263126" lineWidth={1} />
       <Line points={[[width / 2, y - 0.06, depth / 2 + 0.25], [width / 2, y + 0.06, depth / 2 + 0.25]]} color="#263126" lineWidth={1} />
-      <Label position={[0, y, depth / 2 + 0.25]}>{format(width)}</Label>
       <Line points={[[width / 2 + 0.25, 0.02, 0], [width / 2 + 0.25, height + 0.02, 0]]} color="#263126" lineWidth={1} />
-      <Label position={[width / 2 + 0.25, height / 2, 0]}>{format(height)}</Label>
       <Line points={[[-width / 2 - 0.22, y, -depth / 2], [-width / 2 - 0.22, y, depth / 2]]} color="#263126" lineWidth={1} />
-      <Label position={[-width / 2 - 0.22, y, 0]}>{format(depth)}</Label>
     </group>
   );
 }
@@ -274,7 +283,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
         <meshStandardMaterial color={studio ? "#e3e0da" : "#ccd3cc"} roughness={0.96} />
       </mesh>
       {grid && <gridHelper args={[12, 24, "#8f948d", "#c4c4bd"]} position-y={0.006} />}
-      <Suspense fallback={<LoadingModel />}>
+      <Suspense fallback={null}>
         <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} />
       </Suspense>
       {measures && <Dimensions scale={scale} unit={unit} />}
