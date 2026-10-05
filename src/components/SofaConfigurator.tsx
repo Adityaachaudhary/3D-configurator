@@ -26,7 +26,7 @@ import {
   SunMedium,
   Undo2,
 } from "lucide-react";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
@@ -60,6 +60,8 @@ const VIEWS: Record<ViewName, [number, number, number]> = {
   side: [4.2, 1.15, 0],
   rear: [0, 1.15, -4.2],
 };
+const DEFAULT_FABRIC = FABRICS[0] as (typeof FABRICS)[number];
+const DEFAULT_LEG = LEGS[0] as (typeof LEGS)[number];
 
 function createFabricTexture(color: string, weave: string, repeat: number) {
   const canvas = document.createElement("canvas");
@@ -144,8 +146,8 @@ function SofaModel({ fabric, leg, textureScale, scale }: { fabric: FabricId; leg
     return found;
   }, [scene]);
   const geometry = useMemo(() => (sourceMesh ? splitSofaGeometry(sourceMesh.geometry) : null), [sourceMesh]);
-  const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? FABRICS[0];
-  const selectedLeg = LEGS.find((item) => item.id === leg) ?? LEGS[0];
+  const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
+  const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
   const fabricTexture = useMemo(
     () => createFabricTexture(selectedFabric.color, selectedFabric.weave, textureScale),
     [selectedFabric, textureScale],
@@ -225,7 +227,7 @@ function Dimensions({ scale, unit }: { scale: number; unit: Unit }) {
   );
 }
 
-function CameraRig({ controlsRef, view, zoomSignal }: { controlsRef: React.RefObject<OrbitControlsImpl | null>; view: ViewName; zoomSignal: number }) {
+function CameraRig({ controlsRef, view, zoomSignal }: { controlsRef: RefObject<OrbitControlsImpl | null>; view: ViewName; zoomSignal: number }) {
   const { camera, invalidate } = useThree();
   useEffect(() => {
     const target = new THREE.Vector3(...VIEWS[view]);
@@ -293,7 +295,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
   );
 }
 
-function ToolButton({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: React.ReactNode }) {
+function ToolButton({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <Button type="button" variant={active ? "selected" : "outline"} size="icon" onClick={onClick} aria-label={label} title={label}>
       {children}
@@ -331,8 +333,8 @@ export function SofaConfigurator() {
     if (document.fullscreenElement) void document.exitFullscreen();
     else void root.requestFullscreen();
   };
-  const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? FABRICS[0];
-  const selectedLeg = LEGS.find((item) => item.id === leg) ?? LEGS[0];
+  const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
+  const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
