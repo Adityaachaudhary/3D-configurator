@@ -1,4 +1,4 @@
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   Environment,
   Lightformer,
@@ -36,6 +36,22 @@ type FabricId = "oat" | "sage" | "clay" | "ink" | "pearl" | "moss";
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
 type Unit = "cm" | "mm" | "in";
 type ViewName = "perspective" | "front" | "side" | "rear";
+type SeatCount = 1 | 2 | 3;
+
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return reduced;
+}
+
+const MODULE_WIDTH = 0.7;
+const seatingWidth = (seats: number) => BASE_SIZE.width + (seats - 2) * MODULE_WIDTH;
 
 const BASE_SIZE = { width: 1.901083, height: 0.800197, depth: 0.837505 };
 const FABRICS: Array<{ id: FabricId; name: string; family: string; color: string; weave: string }> = [
@@ -177,7 +193,72 @@ function splitSofaGeometry(source: THREE.BufferGeometry) {
   return geometry;
 }
 
-function SofaModel({ fabric, leg, textureScale, scale }: { fabric: FabricId; leg: LegId; textureScale: number; scale: number }) {
+// Clip crossing triangles exactly at module boundaries, retaining UVs and normals.
+// This avoids the open gaps produced by assigning whole triangles by centroid.
+function sliceModule(source: THREE.BufferGeometry, min: number, max: number) {
+  const attributes = Object.entries(source.attributes);
+  const stride = attributes.reduce((sum, [, attribute]) => sum + attribute.itemSize, 0);
+  const index = source.index;
+  const output: number[][] = [[], []];
+  const clip = (polygon: number[][], boundary: number, keepAbove: boolean) => {
+    if (!Number.isFinite(boundary)) return polygon;
+    const result: number[][] = [];
+    for (let i = 0; i < polygon.length; i += 1) {
+      const a = polygon[i];
+      const b = polygon[(i + 1) % polygon.length];
+      if (!a || !b) continue;
+      const ax = a[0] ?? 0;
+      const bx = b[0] ?? 0;
+      const insideA = keepAbove ? ax >= boundary : ax <= boundary;
+      const insideB = keepAbove ? bx >= boundary : bx <= boundary;
+      if (insideA) result.push(a);
+      if (insideA !== insideB) {
+        const t = (boundary - ax) / (bx - ax);
+        result.push(a.map((value, k) => THREE.MathUtils.lerp(value, b[k] ?? value, t)));
+      }
+    }
+    return result;
+  };
+  for (const group of source.groups) {
+    const target = output[group.materialIndex ?? 0];
+    if (!target) continue;
+    for (let i = group.start; i < group.start + group.count; i += 3) {
+      const vertices = [0, 1, 2].map((corner) => {
+        const vertex = index ? index.getX(i + corner) : i + corner;
+        return attributes.flatMap(([, attribute]) =>
+          Array.from({ length: attribute.itemSize }, (_, k) => attribute.getComponent(vertex, k)));
+      });
+      const polygon = clip(clip(vertices, min, true), max, false);
+      for (let k = 1; k < polygon.length - 1; k += 1) {
+        for (const vertex of [polygon[0], polygon[k], polygon[k + 1]]) {
+          if (vertex) target.push(...vertex);
+        }
+      }
+    }
+  }
+  const result = new THREE.BufferGeometry();
+  const data = output.flat();
+  let offset = 0;
+  for (const [name, attribute] of attributes) {
+    const values = new Float32Array(data.length / stride * attribute.itemSize);
+    for (let vertex = 0; vertex < data.length / stride; vertex += 1) {
+      for (let k = 0; k < attribute.itemSize; k += 1) {
+        values[vertex * attribute.itemSize + k] = data[vertex * stride + offset + k] ?? 0;
+      }
+    }
+    result.setAttribute(name, new THREE.BufferAttribute(values, attribute.itemSize));
+    offset += attribute.itemSize;
+  }
+  result.addGroup(0, (output[0]?.length ?? 0) / stride, 0);
+  result.addGroup((output[0]?.length ?? 0) / stride, (output[1]?.length ?? 0) / stride, 1);
+  result.computeBoundingSphere();
+  return result;
+}
+
+function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: { fabric: FabricId; leg: LegId; textureScale: number; scale: number; seats: SeatCount; reducedMotion: boolean }) {
+  const assembly = useRef<THREE.Group>(null);
+  const chair = useRef<THREE.Group>(null);
+  const animatedSeats = useRef<number>(2);
   const { scene } = useGLTF(sofaAsset.url);
   const sourceMesh = useMemo(() => {
     let found: THREE.Mesh | undefined;
@@ -187,6 +268,65 @@ function SofaModel({ fabric, leg, textureScale, scale }: { fabric: FabricId; leg
     return found;
   }, [scene]);
   const geometry = useMemo(() => (sourceMesh ? splitSofaGeometry(sourceMesh.geometry) : null), [sourceMesh]);
+  const modules = useMemo(() => geometry ? [
+    sliceModule(geometry, -Infinity, -MODULE_WIDTH),
+    sliceModule(geometry, MODULE_WIDTH, Infinity),
+    sliceModule(geometry, -MODULE_WIDTH, 0),
+    sliceModule(geometry, 0, MODULE_WIDTH),
+  ] : [], [geometry]);
+  const chairHalf = useMemo(() => {
+    if (!geometry) return null;
+    // Mirror a half-cushion rather than joining mismatched cushion/arm cuts.
+    const half = sliceModule(geometry, -Infinity, -MODULE_WIDTH / 2);
+    const positions = half.getAttribute("position");
+    for (let i = 0; i < positions.count; i += 1) {
+      const x = positions.getX(i);
+      positions.setX(i, (x > -MODULE_WIDTH ? -MODULE_WIDTH + (x + MODULE_WIDTH) * 2 : x) + MODULE_WIDTH / 2);
+    }
+    positions.needsUpdate = true;
+    half.computeVertexNormals();
+    half.computeBoundingSphere();
+    return half;
+  }, [geometry]);
+  useEffect(() => () => chairHalf?.dispose(), [chairHalf]);
+  useEffect(() => () => { geometry?.dispose(); modules.forEach((module) => module.dispose()); }, [geometry, modules]);
+  useFrame((_, rawDelta) => {
+    if (!assembly.current) return;
+    const n = reducedMotion ? seats : THREE.MathUtils.damp(animatedSeats.current, seats, 9, Math.min(rawDelta, 0.05));
+    animatedSeats.current = Math.abs(n - seats) < 0.001 ? seats : n;
+    const current = Math.max(2, animatedSeats.current);
+    const chairBlend = THREE.MathUtils.clamp(2 - animatedSeats.current, 0, 1);
+    assembly.current.visible = chairBlend < 0.999;
+    if (chair.current) {
+      chair.current.visible = chairBlend > 0.001;
+      chair.current.scale.setScalar(scale * (0.95 + chairBlend * 0.05));
+    }
+    for (const material of materials) {
+      material.opacity = 1 - chairBlend;
+      material.transparent = chairBlend > 0;
+      material.depthWrite = chairBlend < 0.01;
+    }
+    for (const material of chairMaterials) {
+      material.opacity = chairBlend;
+      material.transparent = chairBlend < 1;
+      material.depthWrite = chairBlend > 0.99;
+    }
+    const [left, right, first, second, third] = assembly.current.children;
+    if (left) left.position.x = -(current - 2) * MODULE_WIDTH / 2;
+    if (right) right.position.x = (current - 2) * MODULE_WIDTH / 2;
+    if (first) first.position.x = -(current - 2) * MODULE_WIDTH / 2;
+    if (second) {
+      second.scale.x = THREE.MathUtils.clamp(current - 1, 0, 1);
+      second.position.x = (current - 1) * MODULE_WIDTH / 2;
+      second.visible = second.scale.x > 0.001;
+    }
+    if (third) {
+      third.scale.x = THREE.MathUtils.clamp(current - 2, 0, 1);
+      third.visible = third.scale.x > 0.001;
+    }
+    assembly.current.userData["seats"] = current;
+    assembly.current.userData["width"] = seatingWidth(current) * scale;
+  });
   const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
   const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
   const fabricTexture = useMemo(
@@ -211,28 +351,42 @@ function SofaModel({ fabric, leg, textureScale, scale }: { fabric: FabricId; leg
     });
     return [upholstery, feet];
   }, [fabricTexture, selectedFabric, selectedLeg]);
+  const chairMaterials = useMemo(() => materials.map((material) => material.clone()), [materials]);
+  useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
   useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
-  if (!geometry) return null;
+  const [leftCap, rightCap, leftSeat, rightSeat] = modules;
+  if (!geometry || !chairHalf || !leftCap || !rightCap || !leftSeat || !rightSeat) return null;
   return (
-    <mesh
-      geometry={geometry}
-      material={materials}
-      scale={scale}
-      position={[0, 0.396396 * scale + 0.015, 0]}
-      castShadow
-      receiveShadow
-    />
+    <>
+    <group ref={assembly} name="sofa-assembly" scale={scale} position={[0, 0.396396 * scale + 0.015, 0]} dispose={null}>
+      <mesh geometry={leftCap} material={materials} castShadow receiveShadow />
+      <mesh geometry={rightCap} material={materials} castShadow receiveShadow />
+      <mesh geometry={leftSeat} material={materials} castShadow receiveShadow />
+      <group><mesh geometry={rightSeat} material={materials} position-x={-MODULE_WIDTH / 2} castShadow receiveShadow /></group>
+      <group><mesh geometry={leftSeat} material={materials} position-x={MODULE_WIDTH / 2} castShadow receiveShadow /></group>
+    </group>
+    <group ref={chair} name="chair-assembly" scale={scale} position={[0, 0.396396 * scale + 0.015, 0]} dispose={null}>
+      <mesh geometry={chairHalf} material={chairMaterials} castShadow receiveShadow />
+      <mesh geometry={chairHalf} material={chairMaterials} scale-x={-1} castShadow receiveShadow />
+    </group>
+    </>
   );
 }
 
-function Dimensions({ scale, unit }: { scale: number; unit: Unit }) {
+function Dimensions({ scale, unit, seats, reducedMotion }: { scale: number; unit: Unit; seats: SeatCount; reducedMotion: boolean }) {
+  const group = useRef<THREE.Group>(null);
+  const current = useRef<number>(2);
+  useFrame((_, delta) => {
+    current.current = reducedMotion ? seats : THREE.MathUtils.damp(current.current, seats, 9, Math.min(delta, 0.05));
+    if (group.current) group.current.scale.x = seatingWidth(current.current) / BASE_SIZE.width;
+  });
   const width = BASE_SIZE.width * scale;
   const height = BASE_SIZE.height * scale;
   const depth = BASE_SIZE.depth * scale;
   const y = 0.08;
   void unit;
   return (
-    <group>
+    <group ref={group}>
       <Line points={[[-width / 2, y, depth / 2 + 0.25], [width / 2, y, depth / 2 + 0.25]]} color="#263126" lineWidth={1} />
       <Line points={[[-width / 2, y - 0.06, depth / 2 + 0.25], [-width / 2, y + 0.06, depth / 2 + 0.25]]} color="#263126" lineWidth={1} />
       <Line points={[[width / 2, y - 0.06, depth / 2 + 0.25], [width / 2, y + 0.06, depth / 2 + 0.25]]} color="#263126" lineWidth={1} />
@@ -242,30 +396,44 @@ function Dimensions({ scale, unit }: { scale: number; unit: Unit }) {
   );
 }
 
-function CameraRig({ controlsRef, view, zoomSignal }: { controlsRef: RefObject<OrbitControlsImpl | null>; view: ViewName; zoomSignal: number }) {
-  const { camera, invalidate } = useThree();
+function CameraRig({ controlsRef, view, zoomSignal, seats, scale, reducedMotion }: { controlsRef: RefObject<OrbitControlsImpl | null>; view: ViewName; zoomSignal: number; seats: SeatCount; scale: number; reducedMotion: boolean }) {
+  const { camera, invalidate, size } = useThree();
+  const destination = useRef<THREE.Vector3 | null>(null);
+  useFrame((_, delta) => {
+    if (!destination.current) return;
+    camera.position.lerp(destination.current, reducedMotion ? 1 : 1 - Math.exp(-9 * Math.min(delta, 0.05)));
+    controlsRef.current?.update();
+    if (camera.position.distanceTo(destination.current) < 0.002) destination.current = null;
+  });
   useEffect(() => {
     const target = new THREE.Vector3(...VIEWS[view]);
-    camera.position.copy(target);
+    if (camera instanceof THREE.PerspectiveCamera) {
+      const vertical = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const horizontal = vertical * size.width / size.height;
+      const radius = Math.hypot(seatingWidth(seats), BASE_SIZE.depth) * scale / 2;
+      const distance = Math.max(3.2, radius / Math.min(vertical, horizontal) * 1.22);
+      target.sub(new THREE.Vector3(0, 0.42, 0)).normalize().multiplyScalar(distance).add(new THREE.Vector3(0, 0.42, 0));
+    }
+    destination.current = target;
     camera.lookAt(0, 0.42, 0);
     controlsRef.current?.target.set(0, 0.42, 0);
     controlsRef.current?.update();
     invalidate();
-  }, [camera, controlsRef, invalidate, view]);
+  }, [camera, controlsRef, invalidate, view, seats, scale, size.width, size.height]);
   useEffect(() => {
     if (zoomSignal === 0) return;
     const target = controlsRef.current?.target ?? new THREE.Vector3(0, 0.42, 0);
     const direction = camera.position.clone().sub(target);
     const nextDistance = THREE.MathUtils.clamp(direction.length() * (zoomSignal > 0 ? 0.82 : 1.22), 1.7, 7);
-    camera.position.copy(target.clone().add(direction.normalize().multiplyScalar(nextDistance)));
+    destination.current = target.clone().add(direction.normalize().multiplyScalar(nextDistance));
     controlsRef.current?.update();
     invalidate();
   }, [camera, controlsRef, invalidate, zoomSignal]);
   return null;
 }
 
-function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate, studio, view, zoomSignal }: {
-  fabric: FabricId; leg: LegId; textureScale: number; scale: number; grid: boolean; measures: boolean; unit: Unit; rotate: boolean; studio: boolean; view: ViewName; zoomSignal: number;
+function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate, studio, view, zoomSignal, seats, reducedMotion }: {
+  fabric: FabricId; leg: LegId; textureScale: number; scale: number; grid: boolean; measures: boolean; unit: Unit; rotate: boolean; studio: boolean; view: ViewName; zoomSignal: number; seats: SeatCount; reducedMotion: boolean;
 }) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   return (
@@ -290,9 +458,9 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       </mesh>
       {grid && <gridHelper args={[12, 24, "#8f948d", "#c4c4bd"]} position-y={0.006} />}
       <Suspense fallback={null}>
-        <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} />
+        <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} seats={seats} reducedMotion={reducedMotion} />
       </Suspense>
-      {measures && <Dimensions scale={scale} unit={unit} />}
+      {measures && <Dimensions scale={scale} unit={unit} seats={seats} reducedMotion={reducedMotion} />}
       <OrbitControls
         ref={controlsRef}
         makeDefault
@@ -305,7 +473,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
         autoRotateSpeed={0.7}
         target={[0, 0.42, 0]}
       />
-      <CameraRig controlsRef={controlsRef} view={view} zoomSignal={zoomSignal} />
+      <CameraRig controlsRef={controlsRef} view={view} zoomSignal={zoomSignal} seats={seats} scale={scale} reducedMotion={reducedMotion} />
     </Canvas>
   );
 }
@@ -319,6 +487,8 @@ function ToolButton({ label, active, onClick, children }: { label: string; activ
 }
 
 export function SofaConfigurator() {
+  const [seats, setSeats] = useState<SeatCount>(2);
+  const reducedMotion = useReducedMotion();
   const [fabric, setFabric] = useState<FabricId>("oat");
   const [leg, setLeg] = useState<LegId>("oak");
   const [textureScale, setTextureScale] = useState(7);
@@ -330,15 +500,15 @@ export function SofaConfigurator() {
   const [unit, setUnit] = useState<Unit>("cm");
   const [view, setView] = useState<ViewName>("perspective");
   const [zoomSignal, setZoomSignal] = useState(0);
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(false);
   const reset = useCallback(() => {
-    setFabric("oat"); setLeg("oak"); setTextureScale(7); setScale(1); setGrid(true); setMeasures(true); setRotate(false); setStudio(true); setUnit("cm"); setView("perspective");
+    setSeats(2); setFabric("oat"); setLeg("oak"); setTextureScale(7); setScale(1); setGrid(true); setMeasures(true); setRotate(false); setStudio(true); setUnit("cm"); setView("perspective");
   }, []);
   const screenshot = () => {
     const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-viewer-canvas='true']");
     if (!canvas) return;
     const link = document.createElement("a");
-    link.download = `panache-${fabric}-${leg}.png`;
+    link.download = `panache-${seats}-seater-${fabric}-${leg}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
   };
@@ -353,13 +523,13 @@ export function SofaConfigurator() {
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
-      <div className="absolute inset-0"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} /></div>
+      <div className="absolute inset-0 sm:right-[348px]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} /></div>
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between border-b border-border/80 bg-surface/95 px-4 sm:px-6">
         <div className="pointer-events-auto flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground"><Box className="size-4" /></div>
           <div><div className="font-display text-base font-semibold leading-none">Panache</div><div className="mt-1 text-[10px] font-semibold uppercase text-muted-foreground">Product configurator</div></div>
         </div>
-        <div className="hidden text-center md:block"><div className="text-xs font-semibold">Panache OPAA Sofa</div><div className="mt-1 text-[10px] text-muted-foreground">{selectedFabric.name} · {selectedLeg.name}</div></div>
+        <div className="hidden text-center md:block"><div className="text-xs font-semibold">Panache OPAA · {seats} seater</div><div className="mt-1 text-[10px] text-muted-foreground">{selectedFabric.name} · {selectedLeg.name}</div></div>
         <div className="pointer-events-auto flex items-center gap-2">
           <Button variant="outline" size="icon-sm" onClick={reset} aria-label="Reset configuration" title="Reset configuration"><Undo2 className="size-4" /></Button>
           <Button variant="outline" size="icon-sm" onClick={screenshot} aria-label="Download image" title="Download image"><Download className="size-4" /></Button>
@@ -378,7 +548,7 @@ export function SofaConfigurator() {
         <ToolButton label="Change studio" active={!studio} onClick={() => setStudio((value) => !value)}><SunMedium className="size-4" /></ToolButton>
       </nav>
 
-      <section className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-md border border-border bg-surface/95 p-1 shadow-panel sm:bottom-5">
+      <section className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 sm:left-[calc((100%-348px)/2)] rounded-md border border-border bg-surface/95 p-1 shadow-panel sm:bottom-5">
         <div className="flex items-center gap-1" role="group" aria-label="View presets">
           {(["perspective", "front", "side", "rear"] as ViewName[]).map((item) => (
             <Button key={item} variant={view === item ? "selected" : "ghost"} size="sm" onClick={() => setView(item)} className="capitalize">{item}</Button>
@@ -387,12 +557,26 @@ export function SofaConfigurator() {
       </section>
 
       <aside className={cn("absolute bottom-0 right-0 top-16 z-30 w-full border-l border-border bg-surface shadow-panel transition-transform sm:w-[348px]", panelOpen ? "translate-y-0" : "translate-y-[calc(100%-3.25rem)]", "sm:translate-y-0")}>
-        <button type="button" className="flex h-13 w-full items-center justify-between border-b border-border px-5 text-left sm:hidden" onClick={() => setPanelOpen((value) => !value)}>
-          <span className="text-sm font-semibold">Configure materials</span><ChevronDown className={cn("size-4 transition-transform", panelOpen && "rotate-180")} />
-        </button>
+        <Button variant="ghost" type="button" aria-expanded={panelOpen} className="flex h-13 w-full items-center justify-between border-b border-border px-5 text-left sm:hidden" onClick={() => setPanelOpen((value) => !value)}>
+          <span className="text-sm font-semibold">Configure sofa · {seats} seater</span><ChevronDown className={cn("size-4 transition-transform", panelOpen && "rotate-180")} />
+        </Button>
         <div className="h-[calc(100%-3.25rem)] overflow-y-auto px-5 pb-28 pt-5 sm:h-full sm:pb-8">
-          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Material</div><h1 className="mt-1 font-display text-2xl font-semibold">Make it yours</h1></div><Move3D className="size-5 text-muted-foreground" /></div>
-          <section className="mt-7">
+          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-1 font-display text-2xl font-semibold">Make it yours</h1></div><Move3D className="size-5 text-muted-foreground" /></div>
+          <section className="mt-6" aria-labelledby="seating-heading">
+            <div className="flex items-center justify-between"><h2 id="seating-heading" className="text-sm font-semibold">Seating</h2><span className="text-xs text-muted-foreground">{seats} seater</span></div>
+            <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Seating options">
+              {([1, 2, 3] as SeatCount[]).map((count) => (
+                <Button key={count} variant={seats === count ? "selected" : "outline"} aria-pressed={seats === count} aria-label={`${count} seater`} onClick={() => setSeats(count)} className="h-20 flex-col gap-2 px-2">
+                  <span aria-hidden="true" className="flex h-6 items-center gap-0.5 border-x-2 border-current px-1">
+                    {Array.from({ length: count }, (_, i) => <span key={i} className="h-4 w-3 rounded-sm border border-current" />)}
+                  </span>
+                  <span className="text-xs">{count} seater</span>
+                </Button>
+              ))}
+            </div>
+          </section>
+          <div className="my-6 h-px bg-border" />
+          <section>
             <div className="flex items-end justify-between"><div><h2 className="text-sm font-semibold">Upholstery</h2><p className="mt-1 text-xs text-muted-foreground">{selectedFabric.family}</p></div><span className="text-xs font-medium">{selectedFabric.name}</span></div>
             <div className="mt-4 grid grid-cols-3 gap-2">
               {FABRICS.map((item) => (
@@ -417,10 +601,10 @@ export function SofaConfigurator() {
           </section>
           <div className="my-6 h-px bg-border" />
           <section>
-            <div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold">Scale & dimensions</h2><p className="mt-1 text-xs text-muted-foreground">Physical product size</p></div><CircleGauge className="size-4 text-muted-foreground" /></div>
+            <div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold">Scale & dimensions</h2><p className="mt-1 text-xs text-muted-foreground">Estimated configuration size</p></div><CircleGauge className="size-4 text-muted-foreground" /></div>
             <div className="mt-4 flex rounded-md border border-border p-1">{(["cm", "mm", "in"] as Unit[]).map((item) => <Button key={item} variant={unit === item ? "selected" : "ghost"} size="sm" className="flex-1 uppercase" onClick={() => setUnit(item)}>{item}</Button>)}</div>
             <label className="mt-5 block"><span className="flex items-center justify-between text-xs"><span className="font-medium">Model scale</span><span className="font-mono text-muted-foreground">{Math.round(scale * 100)}%</span></span><input className="mt-3 w-full accent-primary" type="range" min="0.8" max="1.2" step="0.01" value={scale} onChange={(event) => setScale(Number(event.target.value))} /></label>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center"><Metric label="Width" value={BASE_SIZE.width * scale} unit={unit} /><Metric label="Height" value={BASE_SIZE.height * scale} unit={unit} /><Metric label="Depth" value={BASE_SIZE.depth * scale} unit={unit} /></div>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center"><Metric label="Width" value={seatingWidth(seats) * scale} unit={unit} /><Metric label="Height" value={BASE_SIZE.height * scale} unit={unit} /><Metric label="Depth" value={BASE_SIZE.depth * scale} unit={unit} /></div>
           </section>
         </div>
       </aside>

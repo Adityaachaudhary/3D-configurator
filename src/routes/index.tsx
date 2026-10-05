@@ -6,9 +6,9 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Panache Sofa Configurator" },
-      { name: "description", content: "Configure the Panache OPAA sofa in 3D with fabric, finish, scale, and precision viewing controls." },
+      { name: "description", content: "Configure one-, two-, and three-seater Panache OPAA sofas in 3D with smooth seating transitions, fabrics, finishes, and measurements." },
       { property: "og:title", content: "Panache Sofa Configurator" },
-      { property: "og:description", content: "Explore and configure the Panache OPAA sofa in an interactive 3D studio." },
+      { property: "og:description", content: "Explore one-, two-, and three-seater Panache OPAA configurations with smooth transitions and custom materials." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
