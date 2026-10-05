@@ -292,7 +292,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: {
   useEffect(() => () => { geometry?.dispose(); modules.forEach((module) => module.dispose()); }, [geometry, modules]);
   useFrame((_, rawDelta) => {
     if (!assembly.current) return;
-    const n = reducedMotion ? seats : THREE.MathUtils.damp(animatedSeats.current, seats, 9, Math.min(rawDelta, 0.05));
+    const n = reducedMotion ? seats : THREE.MathUtils.damp(animatedSeats.current, seats, 14, Math.min(rawDelta, 0.25));
     animatedSeats.current = Math.abs(n - seats) < 0.001 ? seats : n;
     const current = Math.max(2, animatedSeats.current);
     const chairBlend = THREE.MathUtils.clamp(2 - animatedSeats.current, 0, 1);
@@ -377,7 +377,7 @@ function Dimensions({ scale, unit, seats, reducedMotion }: { scale: number; unit
   const group = useRef<THREE.Group>(null);
   const current = useRef<number>(2);
   useFrame((_, delta) => {
-    current.current = reducedMotion ? seats : THREE.MathUtils.damp(current.current, seats, 9, Math.min(delta, 0.05));
+    current.current = reducedMotion ? seats : THREE.MathUtils.damp(current.current, seats, 14, Math.min(delta, 0.25));
     if (group.current) group.current.scale.x = seatingWidth(current.current) / BASE_SIZE.width;
   });
   const width = BASE_SIZE.width * scale;
@@ -401,7 +401,7 @@ function CameraRig({ controlsRef, view, zoomSignal, seats, scale, reducedMotion 
   const destination = useRef<THREE.Vector3 | null>(null);
   useFrame((_, delta) => {
     if (!destination.current) return;
-    camera.position.lerp(destination.current, reducedMotion ? 1 : 1 - Math.exp(-9 * Math.min(delta, 0.05)));
+    camera.position.lerp(destination.current, reducedMotion ? 1 : 1 - Math.exp(-14 * Math.min(delta, 0.25)));
     controlsRef.current?.update();
     if (camera.position.distanceTo(destination.current) < 0.002) destination.current = null;
   });
