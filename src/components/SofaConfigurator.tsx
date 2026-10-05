@@ -141,6 +141,13 @@ function splitSofaGeometry(source: THREE.BufferGeometry) {
     join(a, b);
     join(b, c);
   }
+  const weldedVertices = new Map<string, number>();
+  for (let index = 0; index < position.count; index += 1) {
+    const key = `${position.getX(index).toFixed(5)}:${position.getY(index).toFixed(5)}:${position.getZ(index).toFixed(5)}`;
+    const matchingIndex = weldedVertices.get(key);
+    if (matchingIndex === undefined) weldedVertices.set(key, index);
+    else join(index, matchingIndex);
+  }
   for (let index = 0; index < position.count; index += 1) {
     const root = find(index);
     componentMinY[root] = Math.min(componentMinY[root] ?? Infinity, position.getY(index));
