@@ -140,7 +140,7 @@ function SofaModel({ fabric, leg, textureScale, scale }: { fabric: FabricId; leg
   const { scene } = useGLTF(sofaAsset.url);
   const sourceMesh = useMemo(() => {
     let found: THREE.Mesh | undefined;
-    scene.traverse((object) => {
+    scene.traverse((object: THREE.Object3D) => {
       if (!found && object instanceof THREE.Mesh) found = object;
     });
     return found;
@@ -259,7 +259,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       dpr={[1, 1.75]}
       camera={{ position: VIEWS.perspective, fov: 40, near: 0.1, far: 100 }}
       gl={{ antialias: true, preserveDrawingBuffer: true }}
-      onCreated={({ gl }) => { gl.domElement.dataset.viewerCanvas = "true"; }}
+      onCreated={({ gl }) => { gl.domElement.dataset["viewerCanvas"] = "true"; }}
     >
       <color attach="background" args={[studio ? "#ebe9e4" : "#d9ded8"]} />
       <ambientLight intensity={0.65} />
