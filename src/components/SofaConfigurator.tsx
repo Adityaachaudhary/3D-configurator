@@ -77,6 +77,11 @@ const VIEWS: Record<ViewName, [number, number, number]> = {
 const DEFAULT_FABRIC = FABRICS[0] as (typeof FABRICS)[number];
 const DEFAULT_LEG = LEGS[0] as (typeof LEGS)[number];
 
+function formatDimension(meters: number, unit: Unit) {
+  const factor = unit === "cm" ? 100 : unit === "mm" ? 1000 : 1 / 0.0254;
+  return `${(meters * factor).toFixed(unit === "mm" ? 0 : 1)} ${unit}`;
+}
+
 function createFabricTexture(color: string, weave: string, repeat: number) {
   const canvas = document.createElement("canvas");
   canvas.width = 256;
@@ -255,6 +260,53 @@ function sliceModule(source: THREE.BufferGeometry, min: number, max: number) {
   return result;
 }
 
+// Match the inserted module's cut to the original centre profile, not to the
+// arm-side profile at -MODULE_WIDTH. Those two profiles are not interchangeable.
+function joinedModule(source: THREE.BufferGeometry) {
+  const module = sliceModule(source, -MODULE_WIDTH, 0);
+  const positions = module.getAttribute("position");
+  const attributes = Object.entries(module.attributes);
+  const segments: Array<[number, number]> = [];
+  for (let i = 0; i < positions.count; i += 3) {
+    const edge = [i, i + 1, i + 2].filter((v) => Math.abs(positions.getX(v)) < 1e-6);
+    const [a, b] = edge;
+    if (a !== undefined && b !== undefined) segments.push([a, b]);
+  }
+  const original = module.clone();
+  const profile = original.getAttribute("position");
+  const blendWidth = 0.06;
+  for (let v = 0; v < positions.count; v += 1) {
+    const distance = positions.getX(v) + MODULE_WIDTH;
+    if (distance > blendWidth) continue;
+    let closest = Infinity;
+    let match: [number, number, number] | undefined;
+    for (const [a, b] of segments) {
+      const dy = profile.getY(b) - profile.getY(a);
+      const dz = profile.getZ(b) - profile.getZ(a);
+      const t = THREE.MathUtils.clamp(((positions.getY(v) - profile.getY(a)) * dy + (positions.getZ(v) - profile.getZ(a)) * dz) / (dy * dy + dz * dz || 1), 0, 1);
+      const y = THREE.MathUtils.lerp(profile.getY(a), profile.getY(b), t);
+      const z = THREE.MathUtils.lerp(profile.getZ(a), profile.getZ(b), t);
+      const squared = (positions.getY(v) - y) ** 2 + (positions.getZ(v) - z) ** 2;
+      if (squared < closest) { closest = squared; match = [a, b, t]; }
+    }
+    if (!match) continue;
+    const [a, b, t] = match;
+    const blend = 1 - THREE.MathUtils.smoothstep(Math.max(0, distance), 0, blendWidth);
+    for (const [name, attribute] of attributes) {
+      const reference = original.getAttribute(name);
+      for (let k = name === "position" ? 1 : 0; k < attribute.itemSize; k += 1) {
+        const target = THREE.MathUtils.lerp(reference.getComponent(a, k), reference.getComponent(b, k), t);
+        attribute.setComponent(v, k, THREE.MathUtils.lerp(attribute.getComponent(v, k), target, blend));
+      }
+      attribute.needsUpdate = true;
+    }
+  }
+  original.dispose();
+  module.computeBoundingBox();
+  module.computeBoundingSphere();
+  return module;
+}
+
 function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: { fabric: FabricId; leg: LegId; textureScale: number; scale: number; seats: SeatCount; reducedMotion: boolean }) {
   const assembly = useRef<THREE.Group>(null);
   const chair = useRef<THREE.Group>(null);
@@ -273,6 +325,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: {
     sliceModule(geometry, MODULE_WIDTH, Infinity),
     sliceModule(geometry, -MODULE_WIDTH, 0),
     sliceModule(geometry, 0, MODULE_WIDTH),
+    joinedModule(geometry),
   ] : [], [geometry]);
   const chairHalf = useMemo(() => {
     if (!geometry) return null;
@@ -354,8 +407,8 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: {
   const chairMaterials = useMemo(() => materials.map((material) => material.clone()), [materials]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
   useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
-  const [leftCap, rightCap, leftSeat, rightSeat] = modules;
-  if (!geometry || !chairHalf || !leftCap || !rightCap || !leftSeat || !rightSeat) return null;
+  const [leftCap, rightCap, leftSeat, rightSeat, insertSeat] = modules;
+  if (!geometry || !chairHalf || !leftCap || !rightCap || !leftSeat || !rightSeat || !insertSeat) return null;
   return (
     <>
     <group ref={assembly} name="sofa-assembly" scale={scale} position={[0, 0.396396 * scale + 0.015, 0]} dispose={null}>
@@ -363,7 +416,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: {
       <mesh geometry={rightCap} material={materials} castShadow receiveShadow />
       <mesh geometry={leftSeat} material={materials} castShadow receiveShadow />
       <group><mesh geometry={rightSeat} material={materials} position-x={-MODULE_WIDTH / 2} castShadow receiveShadow /></group>
-      <group><mesh geometry={leftSeat} material={materials} position-x={MODULE_WIDTH / 2} castShadow receiveShadow /></group>
+      <group><mesh geometry={insertSeat} material={materials} position-x={MODULE_WIDTH / 2} castShadow receiveShadow /></group>
     </group>
     <group ref={chair} name="chair-assembly" scale={scale} position={[0, 0.396396 * scale + 0.015, 0]} dispose={null}>
       <mesh geometry={chairHalf} material={chairMaterials} castShadow receiveShadow />
@@ -373,26 +426,58 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: {
   );
 }
 
+function DimensionLabel({ axis, value, position }: { axis: string; value: string; position: [number, number, number] }) {
+  const { gl, camera, size } = useThree();
+  const anchor = useRef<THREE.Group>(null);
+  const label = useRef<HTMLSpanElement>(null);
+  const projected = useMemo(() => new THREE.Vector3(), []);
+  useEffect(() => { label.current = document.querySelector<HTMLSpanElement>(`[data-dimension="${axis}"]`); }, [axis, gl]);
+  useFrame(() => {
+    if (!anchor.current || !label.current) return;
+    label.current.textContent = value;
+    anchor.current.updateWorldMatrix(true, false);
+    anchor.current.getWorldPosition(projected).project(camera);
+    label.current.style.transform = `translate(${(projected.x + 1) * size.width / 2}px, ${(1 - projected.y) * size.height / 2}px) translate(-50%, -50%)`;
+    label.current.hidden = projected.z > 1 || projected.z < -1;
+  });
+  return <group ref={anchor} position={position} />;
+}
+
 function Dimensions({ scale, unit, seats, reducedMotion }: { scale: number; unit: Unit; seats: SeatCount; reducedMotion: boolean }) {
   const group = useRef<THREE.Group>(null);
+  const heightRuler = useRef<THREE.Group>(null);
+  const depthRuler = useRef<THREE.Group>(null);
   const current = useRef<number>(2);
   useFrame((_, delta) => {
     current.current = reducedMotion ? seats : THREE.MathUtils.damp(current.current, seats, 14, Math.min(delta, 0.25));
     if (group.current) group.current.scale.x = seatingWidth(current.current) / BASE_SIZE.width;
+    const halfWidth = seatingWidth(current.current) * scale / 2;
+    if (heightRuler.current) heightRuler.current.position.x = halfWidth + 0.25;
+    if (depthRuler.current) depthRuler.current.position.x = -halfWidth - 0.22;
   });
   const width = BASE_SIZE.width * scale;
   const height = BASE_SIZE.height * scale;
   const depth = BASE_SIZE.depth * scale;
   const y = 0.08;
-  void unit;
   return (
+    <>
     <group ref={group}>
       <Line points={[[-width / 2, y, depth / 2 + 0.25], [width / 2, y, depth / 2 + 0.25]]} color="#263126" lineWidth={1} />
       <Line points={[[-width / 2, y - 0.06, depth / 2 + 0.25], [-width / 2, y + 0.06, depth / 2 + 0.25]]} color="#263126" lineWidth={1} />
       <Line points={[[width / 2, y - 0.06, depth / 2 + 0.25], [width / 2, y + 0.06, depth / 2 + 0.25]]} color="#263126" lineWidth={1} />
-      <Line points={[[width / 2 + 0.25, 0.02, 0], [width / 2 + 0.25, height + 0.02, 0]]} color="#263126" lineWidth={1} />
-      <Line points={[[-width / 2 - 0.22, y, -depth / 2], [-width / 2 - 0.22, y, depth / 2]]} color="#263126" lineWidth={1} />
     </group>
+    <group position={[0, y - 0.04, depth / 2 + 0.32]}>
+      <DimensionLabel axis="width" position={[0, 0, 0]} value={formatDimension(seatingWidth(seats) * scale, unit)} />
+    </group>
+    <group ref={heightRuler} position={[seatingWidth(seats) * scale / 2 + 0.25, 0, 0]}>
+      <Line points={[[0, 0.015, 0], [0, height + 0.015, 0]]} color="#263126" lineWidth={1} />
+      <DimensionLabel axis="height" position={[0, height / 2 + 0.015, 0]} value={formatDimension(height, unit)} />
+    </group>
+    <group ref={depthRuler} position={[-seatingWidth(seats) * scale / 2 - 0.22, 0, 0]}>
+      <Line points={[[0, y, -depth / 2], [0, y, depth / 2]]} color="#263126" lineWidth={1} />
+      <DimensionLabel axis="depth" position={[0, y, 0]} value={formatDimension(depth, unit)} />
+    </group>
+    </>
   );
 }
 
@@ -523,7 +608,7 @@ export function SofaConfigurator() {
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
-      <div className="absolute inset-0 sm:right-[348px]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} /></div>
+      <div className="absolute inset-0 sm:right-[348px]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} />{measures && (["width", "height", "depth"] as const).map((axis) => <span key={axis} data-dimension={axis} className="pointer-events-none absolute left-0 top-0 z-10 whitespace-nowrap rounded-sm bg-dimension px-2 py-1 font-mono text-xs text-dimension-foreground" />)}</div>
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between border-b border-border/80 bg-surface/95 px-4 sm:px-6">
         <div className="pointer-events-auto flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground"><Box className="size-4" /></div>
@@ -614,8 +699,7 @@ export function SofaConfigurator() {
 }
 
 function Metric({ label, value, unit }: { label: string; value: number; unit: Unit }) {
-  const factor = unit === "cm" ? 100 : unit === "mm" ? 1000 : 39.3701;
-  return <div className="rounded-md bg-muted px-2 py-3"><div className="text-[9px] font-semibold uppercase text-muted-foreground">{label}</div><div className="mt-1 font-mono text-xs font-semibold">{Math.round(value * factor)} {unit}</div></div>;
+  return <div className="rounded-md bg-muted px-2 py-3"><div className="text-[9px] font-semibold uppercase text-muted-foreground">{label}</div><div className="mt-1 font-mono text-xs font-semibold">{formatDimension(value, unit)}</div></div>;
 }
 
 useGLTF.preload(sofaAsset.url);

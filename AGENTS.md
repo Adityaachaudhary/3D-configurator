@@ -11,4 +11,5 @@
 
 - Keep the 3D configurator client-only and isolate all Three.js scene logic in `SofaConfigurator.tsx` because WebGL cannot render during SSR.
 - Treat the uploaded sofa as one mesh and separate leg faces spatially into a second material group because the source GLB has only one unnamed material.
-- Derive seating variants by clipping the source into fixed end caps and reusable central modules; animate module transforms with delta-time damping to preserve arm and leg proportions without reloading the asset.
+- Derive seating variants from fixed end caps and clipped central modules; match inserted cut profiles to the original centre profile with interpolated normals and UVs so joins remain closed across fabrics, and animate transforms without reloading the asset.
+- Use one meter-based dimension formatter for ruler labels and panel metrics; keep height/depth rulers separate from width animation so unit changes never distort geometry.
