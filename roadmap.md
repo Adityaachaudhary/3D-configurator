@@ -5,3 +5,6 @@
 - [x] Close the inserted three-seater module's mismatched cut profile across fabrics.
 - [x] Display scaled ruler labels and panel measurements in cm, mm, and inches.
 - [x] Verify joins and measurement conversions in the viewer.
+## Compact configuration panel
+- [x] Shrink fabric swatches and tighten panel spacing and type sizes.
+- [x] Verify panel width, collapse behaviour, and that controls still work.
