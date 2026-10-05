@@ -608,7 +608,7 @@ export function SofaConfigurator() {
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
-      <div className="absolute inset-0 sm:right-[348px]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} />{measures && (["width", "height", "depth"] as const).map((axis) => <span key={axis} data-dimension={axis} className="pointer-events-none absolute left-0 top-0 z-10 whitespace-nowrap rounded-sm bg-dimension px-2 py-1 font-mono text-xs text-dimension-foreground" />)}</div>
+      <div className="absolute inset-0 sm:right-[var(--panel-width)]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} />{measures && (["width", "height", "depth"] as const).map((axis) => <span key={axis} data-dimension={axis} className="pointer-events-none absolute left-0 top-0 z-10 whitespace-nowrap rounded-sm bg-dimension px-1.5 py-0.5 font-mono text-[11px] text-dimension-foreground" />)}</div>
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between border-b border-border/80 bg-surface/95 px-4 sm:px-6">
         <div className="pointer-events-auto flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground"><Box className="size-4" /></div>
@@ -633,7 +633,7 @@ export function SofaConfigurator() {
         <ToolButton label="Change studio" active={!studio} onClick={() => setStudio((value) => !value)}><SunMedium className="size-4" /></ToolButton>
       </nav>
 
-      <section className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 sm:left-[calc((100%-348px)/2)] rounded-md border border-border bg-surface/95 p-1 shadow-panel sm:bottom-5">
+      <section className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 sm:left-[calc((100%_-_var(--panel-width))/_2)] rounded-md border border-border bg-surface/95 p-1 shadow-panel sm:bottom-5">
         <div className="flex items-center gap-1" role="group" aria-label="View presets">
           {(["perspective", "front", "side", "rear"] as ViewName[]).map((item) => (
             <Button key={item} variant={view === item ? "selected" : "ghost"} size="sm" onClick={() => setView(item)} className="capitalize">{item}</Button>
@@ -641,55 +641,55 @@ export function SofaConfigurator() {
         </div>
       </section>
 
-      <aside className={cn("absolute bottom-0 right-0 top-16 z-30 w-full border-l border-border bg-surface shadow-panel transition-transform sm:w-[348px]", panelOpen ? "translate-y-0" : "translate-y-[calc(100%-3.25rem)]", "sm:translate-y-0")}>
-        <Button variant="ghost" type="button" aria-expanded={panelOpen} className="flex h-13 w-full items-center justify-between border-b border-border px-5 text-left sm:hidden" onClick={() => setPanelOpen((value) => !value)}>
+      <aside className={cn("absolute bottom-0 right-0 top-16 z-30 w-full border-l border-border bg-surface shadow-panel transition-transform sm:w-[var(--panel-width)]", panelOpen ? "translate-y-0" : "translate-y-[calc(100%_-_3.25rem)]", "sm:translate-y-0")}>
+        <Button variant="ghost" type="button" aria-expanded={panelOpen} className="flex h-13 w-full items-center justify-between border-b border-border px-4 text-left sm:hidden" onClick={() => setPanelOpen((value) => !value)}>
           <span className="text-sm font-semibold">Configure sofa · {seats} seater</span><ChevronDown className={cn("size-4 transition-transform", panelOpen && "rotate-180")} />
         </Button>
-        <div className="h-[calc(100%-3.25rem)] overflow-y-auto px-5 pb-28 pt-5 sm:h-full sm:pb-8">
-          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-1 font-display text-2xl font-semibold">Make it yours</h1></div><Move3D className="size-5 text-muted-foreground" /></div>
-          <section className="mt-6" aria-labelledby="seating-heading">
-            <div className="flex items-center justify-between"><h2 id="seating-heading" className="text-sm font-semibold">Seating</h2><span className="text-xs text-muted-foreground">{seats} seater</span></div>
-            <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Seating options">
+        <div className="h-[calc(100%_-_3.25rem)] overflow-y-auto px-4 pb-24 pt-4 sm:h-full sm:pb-6">
+          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-0.5 font-display text-lg font-semibold leading-none">Make it yours</h1></div><Move3D className="size-4 text-muted-foreground" /></div>
+          <section className="mt-4" aria-labelledby="seating-heading">
+            <div className="flex items-center justify-between"><h2 id="seating-heading" className="text-[13px] font-semibold">Seating</h2><span className="text-[11px] text-muted-foreground">{seats} seater</span></div>
+            <div className="mt-2 grid grid-cols-3 gap-1.5" role="group" aria-label="Seating options">
               {([1, 2, 3] as SeatCount[]).map((count) => (
-                <Button key={count} variant={seats === count ? "selected" : "outline"} aria-pressed={seats === count} aria-label={`${count} seater`} onClick={() => setSeats(count)} className="h-20 flex-col gap-2 px-2">
-                  <span aria-hidden="true" className="flex h-6 items-center gap-0.5 border-x-2 border-current px-1">
-                    {Array.from({ length: count }, (_, i) => <span key={i} className="h-4 w-3 rounded-sm border border-current" />)}
+                <Button key={count} variant={seats === count ? "selected" : "outline"} aria-pressed={seats === count} aria-label={`${count} seater`} onClick={() => setSeats(count)} className="h-14 flex-col gap-1 px-1 text-[11px]">
+                  <span aria-hidden="true" className="flex h-4 items-center gap-[3px] border-x-2 border-current px-1">
+                    {Array.from({ length: count }, (_, i) => <span key={i} className="h-3 w-2 rounded-[2px] border border-current" />)}
                   </span>
-                  <span className="text-xs">{count} seater</span>
+                  <span>{count} seater</span>
                 </Button>
               ))}
             </div>
           </section>
-          <div className="my-6 h-px bg-border" />
+          <div className="my-4 h-px bg-border" />
           <section>
-            <div className="flex items-end justify-between"><div><h2 className="text-sm font-semibold">Upholstery</h2><p className="mt-1 text-xs text-muted-foreground">{selectedFabric.family}</p></div><span className="text-xs font-medium">{selectedFabric.name}</span></div>
-            <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="flex items-end justify-between"><div><h2 className="text-[13px] font-semibold">Upholstery</h2><p className="mt-0.5 text-[11px] text-muted-foreground">{selectedFabric.family}</p></div><span className="text-[11px] font-medium">{selectedFabric.name}</span></div>
+            <div className="mt-2 grid grid-cols-6 gap-1.5">
               {FABRICS.map((item) => (
-                <button key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative aspect-square rounded-md border bg-muted p-1.5 text-left", fabric === item.id ? "border-primary ring-1 ring-primary" : "border-border")}>
-                  <span className="block h-full rounded-sm" style={{ backgroundColor: item.color }} />
-                  {fabric === item.id && <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-3" /></span>}
+                <button key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-9 rounded-md border bg-muted p-1 text-left", fabric === item.id ? "border-primary ring-1 ring-primary" : "border-border")}>
+                  <span className="block h-full rounded-[3px]" style={{ backgroundColor: item.color }} />
+                  {fabric === item.id && <span className="absolute right-1 top-1 flex size-3 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-2" /></span>}
                 </button>
               ))}
             </div>
-            <label className="mt-5 block"><span className="flex items-center justify-between text-xs"><span className="font-medium">Weave scale</span><span className="font-mono text-muted-foreground">{textureScale}×</span></span><input className="mt-3 w-full accent-primary" type="range" min="3" max="14" step="1" value={textureScale} onChange={(event) => setTextureScale(Number(event.target.value))} /></label>
+            <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">Weave scale</span><span className="font-mono text-muted-foreground">{textureScale}×</span></span><input className="mt-2 w-full accent-primary" type="range" min="3" max="14" step="1" value={textureScale} onChange={(event) => setTextureScale(Number(event.target.value))} /></label>
           </section>
-          <div className="my-6 h-px bg-border" />
+          <div className="my-4 h-px bg-border" />
           <section>
-            <div className="flex items-end justify-between"><div><h2 className="text-sm font-semibold">Leg finish</h2><p className="mt-1 text-xs text-muted-foreground">Frame details</p></div><span className="text-xs font-medium">{selectedLeg.name}</span></div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="flex items-end justify-between"><div><h2 className="text-[13px] font-semibold">Leg finish</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Frame details</p></div><span className="text-[11px] font-medium">{selectedLeg.name}</span></div>
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
               {LEGS.map((item) => (
-                <button key={item.id} type="button" onClick={() => setLeg(item.id)} aria-pressed={leg === item.id} className={cn("flex h-12 items-center gap-3 rounded-md border px-3 text-left text-xs font-medium", leg === item.id ? "border-primary bg-accent" : "border-border bg-surface")}>
-                  <span className="size-6 rounded-sm border border-border" style={{ backgroundColor: item.color }} />{item.name}{leg === item.id && <Check className="ml-auto size-3.5" />}
+                <button key={item.id} type="button" onClick={() => setLeg(item.id)} aria-pressed={leg === item.id} className={cn("flex h-9 items-center gap-2 rounded-md border px-2 text-left text-[11px] font-medium", leg === item.id ? "border-primary bg-accent" : "border-border bg-surface")}>
+                  <span className="size-4 shrink-0 rounded-[3px] border border-border" style={{ backgroundColor: item.color }} />{item.name}{leg === item.id && <Check className="ml-auto size-3" />}
                 </button>
               ))}
             </div>
           </section>
-          <div className="my-6 h-px bg-border" />
+          <div className="my-4 h-px bg-border" />
           <section>
-            <div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold">Scale & dimensions</h2><p className="mt-1 text-xs text-muted-foreground">Estimated configuration size</p></div><CircleGauge className="size-4 text-muted-foreground" /></div>
-            <div className="mt-4 flex rounded-md border border-border p-1">{(["cm", "mm", "in"] as Unit[]).map((item) => <Button key={item} variant={unit === item ? "selected" : "ghost"} size="sm" className="flex-1 uppercase" onClick={() => setUnit(item)}>{item}</Button>)}</div>
-            <label className="mt-5 block"><span className="flex items-center justify-between text-xs"><span className="font-medium">Model scale</span><span className="font-mono text-muted-foreground">{Math.round(scale * 100)}%</span></span><input className="mt-3 w-full accent-primary" type="range" min="0.8" max="1.2" step="0.01" value={scale} onChange={(event) => setScale(Number(event.target.value))} /></label>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center"><Metric label="Width" value={seatingWidth(seats) * scale} unit={unit} /><Metric label="Height" value={BASE_SIZE.height * scale} unit={unit} /><Metric label="Depth" value={BASE_SIZE.depth * scale} unit={unit} /></div>
+            <div className="flex items-center justify-between"><div><h2 className="text-[13px] font-semibold">Scale & dimensions</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Estimated configuration size</p></div><CircleGauge className="size-4 text-muted-foreground" /></div>
+            <div className="mt-2 flex rounded-md border border-border p-0.5">{(["cm", "mm", "in"] as Unit[]).map((item) => <Button key={item} variant={unit === item ? "selected" : "ghost"} size="sm" className="h-7 flex-1 px-1 text-[11px] uppercase" onClick={() => setUnit(item)}>{item}</Button>)}</div>
+            <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">Model scale</span><span className="font-mono text-muted-foreground">{Math.round(scale * 100)}%</span></span><input className="mt-2 w-full accent-primary" type="range" min="0.8" max="1.2" step="0.01" value={scale} onChange={(event) => setScale(Number(event.target.value))} /></label>
+            <div className="mt-3 grid grid-cols-3 gap-1.5 text-center"><Metric label="Width" value={seatingWidth(seats) * scale} unit={unit} /><Metric label="Height" value={BASE_SIZE.height * scale} unit={unit} /><Metric label="Depth" value={BASE_SIZE.depth * scale} unit={unit} /></div>
           </section>
         </div>
       </aside>
@@ -699,7 +699,7 @@ export function SofaConfigurator() {
 }
 
 function Metric({ label, value, unit }: { label: string; value: number; unit: Unit }) {
-  return <div className="rounded-md bg-muted px-2 py-3"><div className="text-[9px] font-semibold uppercase text-muted-foreground">{label}</div><div className="mt-1 font-mono text-xs font-semibold">{formatDimension(value, unit)}</div></div>;
+  return <div className="rounded-md bg-muted px-1.5 py-2"><div className="text-[9px] font-semibold uppercase text-muted-foreground">{label}</div><div className="mt-0.5 font-mono text-[11px] font-semibold">{formatDimension(value, unit)}</div></div>;
 }
 
 useGLTF.preload(sofaAsset.url);
