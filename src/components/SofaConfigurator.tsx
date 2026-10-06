@@ -465,6 +465,9 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   }), [materials, textureScale, leg, scale]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
   useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
+  useEffect(() => {
+    for (const material of [...materials, ...chairMaterials]) material.wireframe = wireframe;
+  }, [materials, chairMaterials, wireframe]);
   const [leftCap, rightCap, leftSeat, rightSeat, insertLeft, insertRight] = modules;
   if (!geometry || !chairHalf || !chairOtherHalf || !leftCap || !rightCap || !leftSeat || !rightSeat || !insertLeft || !insertRight) return null;
   return (
@@ -601,7 +604,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       </mesh>
       {grid && <gridHelper args={[12, 24, "#8f948d", "#c4c4bd"]} position-y={0.006} />}
       <Suspense fallback={null}>
-        <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} seats={seats} reducedMotion={reducedMotion} />
+        <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} seats={seats} reducedMotion={reducedMotion} wireframe={wireframe} />
       </Suspense>
       {measures && <Dimensions scale={scale} unit={unit} seats={seats} reducedMotion={reducedMotion} />}
       <OrbitControls
