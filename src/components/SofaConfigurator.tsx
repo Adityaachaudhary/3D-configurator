@@ -33,7 +33,7 @@ import sofaAsset from "@/assets/Panache-OPAA.glb.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type FabricId = "oat" | "sage" | "clay" | "ink" | "pearl" | "moss" | "ocean-stripe" | "olive-check" | "rose-check" | "ochre-chevron" | "teal-diamond" | "graphite-stripe";
+type FabricId = "oat" | "sage" | "clay" | "ink" | "pearl" | "moss" | "ocean-stripe" | "olive-check" | "rose-check" | "ochre-chevron" | "teal-diamond" | "graphite-stripe" | "cognac-leather" | "charcoal-leather" | "ivory-leather" | "olive-leather";
 type PatternKind = "stripe" | "check" | "chevron" | "diamond";
 type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind };
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
@@ -71,6 +71,10 @@ const FABRICS: FabricPreset[] = [
   { id: "ochre-chevron", name: "Ochre Chevron", family: "Chevron · Twill", color: "#ffffff", weave: "twill", pattern: "chevron" },
   { id: "teal-diamond", name: "Teal Diamond", family: "Diamond · Jacquard", color: "#ffffff", weave: "twill", pattern: "diamond" },
   { id: "graphite-stripe", name: "Graphite Stripe", family: "Stripe · Linen", color: "#ffffff", weave: "linen", pattern: "stripe" },
+  { id: "cognac-leather", name: "Cognac Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
+  { id: "charcoal-leather", name: "Charcoal Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
+  { id: "ivory-leather", name: "Ivory Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
+  { id: "olive-leather", name: "Olive Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
 ];
 const LEGS: Array<{ id: LegId; name: string; color: string; metalness: number; roughness: number }> = [
   { id: "oak", name: "Natural oak", color: "#9b7147", metalness: 0, roughness: 0.54 },
@@ -109,6 +113,7 @@ function createSurfaceMaps(kind: string) {
       else if (kind === "steel") height = 0.5 + 0.2 * Math.sin(u * 95) + noise * 0.05;
       else if (kind === "loop") height = 0.5 + 0.23 * Math.sin(u * 20 + Math.sin(v * 24)) * Math.cos(v * 24 + Math.sin(u * 20)) + noise * 0.1;
       else if (kind === "velvet") height = 0.5 + noise * 0.12;
+      else if (kind === "leather") height = 0.5 + 0.09 * Math.sin(u * 37 + 2 * Math.sin(v * 13)) * Math.sin(v * 43 + Math.cos(u * 17)) + noise * 0.035;
       else {
         const warp = Math.cos(u * 32);
         const weft = Math.cos(v * 32);
@@ -116,7 +121,7 @@ function createSurfaceMaps(kind: string) {
         height = 0.5 + 0.22 * (over > 0 ? warp : weft) + noise * 0.06;
       }
       const i = (y * size + x) * 4;
-      const contrast = kind === "wood" ? 0.3 : kind === "velvet" ? 0.12 : 0.35;
+      const contrast = kind === "wood" ? 0.3 : kind === "velvet" || kind === "leather" ? 0.045 : 0.10;
       const value = Math.round(255 * (0.94 + (height - 0.5) * contrast));
       for (let k = 0; k < 3; k += 1) {
         colour[i + k] = value;
@@ -208,12 +213,15 @@ function FabricSwatch({ fabric }: { fabric: FabricPreset }) {
   return <span className="relative block h-9 w-full shrink-0 overflow-hidden rounded-[3px]"><canvas ref={canvas} width={192} height={192} aria-hidden="true" className="absolute inset-0 block h-full w-full" /></span>;
 }
 
-function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null) {
+// Restrict thread size to a believable range; printed repeat size remains independently adjustable.
+const weaveDensity = (value: number) => 5.6 * 7 / (5.5 + (value - 3) * 3 / 11);
+
+function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null, patternRepeat = density * (8 / 5.6)) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms["surfaceDensity"] = { value: density / scale };
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
-      shader.uniforms["patternDensity"] = { value: density * (8 / 5.6) / scale };
+      shader.uniforms["patternDensity"] = { value: patternRepeat / scale };
     }
     shader.vertexShader = "varying vec3 surfacePosition; varying vec3 surfaceNormal;\n" + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace("#include <worldpos_vertex>", `#include <worldpos_vertex>
@@ -255,7 +263,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", "surfaceSample(bumpMap, surfacePosition + dSTdx).x")
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", "surfaceSample(bumpMap, surfacePosition + dSTdy).x");
   };
-  material.customProgramCacheKey = () => `physical-surface-v2-${density}-${scale}-${pattern?.uuid ?? "plain"}`;
+  material.customProgramCacheKey = () => `physical-surface-v3-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
@@ -566,14 +574,26 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   useEffect(() => () => Object.values(fabricTexture).forEach((map) => map.dispose()), [fabricTexture]);
   useEffect(() => () => Object.values(legTexture).forEach((map) => map.dispose()), [legTexture]);
   const materials = useMemo(() => {
+    const leather = selectedFabric.weave === "leather";
+    const colorCanvas = document.createElement("canvas");
+    const colorContext = colorCanvas.getContext("2d");
+    let fabricColor = new THREE.Color(selectedFabric.color || DEFAULT_FABRIC.color);
+    if (!selectedFabric.pattern && colorContext) {
+      colorContext.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(`--fabric-${selectedFabric.id}`).trim();
+      colorContext.fillRect(0, 0, 1, 1);
+      const rgb = colorContext.getImageData(0, 0, 1, 1).data;
+      fabricColor = new THREE.Color().setRGB((rgb[0] ?? 0) / 255, (rgb[1] ?? 0) / 255, (rgb[2] ?? 0) / 255, THREE.SRGBColorSpace);
+    }
     const upholstery = new THREE.MeshPhysicalMaterial({
-      color: selectedFabric.color,
+      color: fabricColor,
       ...fabricTexture,
-      bumpScale: selectedFabric.weave === "loop" ? 0.00065 : selectedFabric.weave === "velvet" ? 0.00008 : 0.0003,
-      roughness: selectedFabric.weave === "velvet" ? 0.78 : 0.91,
+      bumpScale: leather ? 0.00006 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
+      roughness: leather ? 0.48 : selectedFabric.weave === "velvet" ? 0.78 : 0.91,
       metalness: 0,
-      sheen: selectedFabric.weave === "velvet" ? 0.7 : selectedFabric.weave === "loop" ? 0.3 : 0.18,
-      sheenColor: new THREE.Color(selectedFabric.color).lerp(new THREE.Color(1, 1, 1), 0.35),
+      sheen: leather ? 0 : selectedFabric.weave === "velvet" ? 0.7 : selectedFabric.weave === "loop" ? 0.3 : 0.18,
+      sheenColor: fabricColor.clone().lerp(new THREE.Color(1, 1, 1), 0.35),
+      clearcoat: leather ? 0.16 : 0,
+      clearcoatRoughness: leather ? 0.52 : 0,
       sheenRoughness: 0.85,
     });
     const feet = new THREE.MeshStandardMaterial({
@@ -583,13 +603,13 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       roughness: selectedLeg.roughness,
       metalness: selectedLeg.metalness,
     });
-    projectSurface(upholstery, 5.6 * 7 / textureScale, scale, patternTexture);
+    projectSurface(upholstery, weaveDensity(textureScale), scale, patternTexture, 56 / textureScale);
     projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
   }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture]);
   const chairMaterials = useMemo(() => materials.map((material, i) => {
     const clone = material.clone();
-    projectSurface(clone, i === 0 ? 5.6 * 7 / textureScale : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null);
+    projectSurface(clone, i === 0 ? weaveDensity(textureScale) : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null, 56 / textureScale);
     return clone;
   }), [materials, textureScale, leg, scale, patternTexture]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
