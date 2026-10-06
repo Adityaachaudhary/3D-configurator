@@ -247,7 +247,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     if (tuft) {
       shader.uniforms["tuftMap"] = { value: tuft };
       shader.uniforms["tuftDensity"] = { value: 4.5 / scale };
-      shader.uniforms["tuftDepth"] = { value: 0.020 * scale };
+      shader.uniforms["tuftDepth"] = { value: 0.004 * scale };
     }
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
@@ -306,7 +306,19 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         }
         vec4 surfaceRelief(sampler2D tex, vec3 p) { return vec4(tuftHeight(p) + surfaceSample(tex, p).r * 0.075); }
         \n`);
-      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.80 + 0.20 * tuftHeight(surfacePosition);');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.86 + 0.14 * tuftHeight(surfacePosition);');
+      // Use physical surface derivatives: Three's normalized bump derivatives
+      // otherwise flatten large padded forms at normal viewing distances.
+      shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `
+        vec3 paddingDx = dFdx(-vViewPosition);
+        vec3 paddingDy = dFdy(-vViewPosition);
+        vec3 paddingR1 = cross(paddingDy, normal);
+        vec3 paddingR2 = cross(normal, paddingDx);
+        float paddingDet = dot(paddingDx, paddingR1);
+        float paddingHeight = tuftHeight(surfacePosition) * 0.014 * ${scale.toFixed(6)};
+        vec3 paddingGradient = sign(paddingDet) * (dFdx(paddingHeight) * paddingR1 + dFdy(paddingHeight) * paddingR2);
+        normal = normalize(abs(paddingDet) * normal - paddingGradient);
+      `);
     }
     if (pattern) {
       shader.fragmentShader = `uniform sampler2D patternMap;
@@ -334,7 +346,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v9-supple-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
+  material.customProgramCacheKey = () => `physical-surface-v10-supple-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
