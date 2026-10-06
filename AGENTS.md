@@ -21,3 +21,4 @@
 - Toggle wireframe by setting `material.wireframe` on the shared upholstery/leg materials (and chair clones) in an effect, so it applies uniformly across all derived seating modules.
 - Use OrbitControls' built-in zoom (zoomToCursor, minDistance 1.7, maxDistance 7) for wheel/pinch; keep the toolbar zoom buttons driving CameraRig's zoomSignal so both share the same distance limits.
 - Clamp procedural texture bytes before writing Uint8Array data because out-of-range values wrap to black.
+- Render floor grid lines after the opaque floor with depth testing enabled and depth writes disabled so the floor cannot erase them and the sofa still occludes them.
