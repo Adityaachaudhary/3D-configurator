@@ -306,6 +306,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         }
         vec4 surfaceRelief(sampler2D tex, vec3 p) { return vec4(tuftHeight(p) + surfaceSample(tex, p).r * 0.075); }
         \n`);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.rgb = vec3(tuftHeight(surfacePosition));');
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.48 + 0.52 * tuftHeight(surfacePosition);');
     }
     if (pattern) {
@@ -334,7 +335,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v7-supple-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
+  material.customProgramCacheKey = () => `physical-surface-v8-supple-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
