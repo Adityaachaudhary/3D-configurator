@@ -617,7 +617,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const upholstery = new THREE.MeshPhysicalMaterial({
       color: fabricColor,
       ...fabricTexture,
-      bumpScale: selectedFabric.tufted ? 0.018 : leather ? 0.00045 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
+      bumpScale: selectedFabric.tufted ? 0.045 : leather ? 0.00045 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
       roughness: leather ? 0.48 : selectedFabric.weave === "velvet" ? 0.78 : 0.91,
       metalness: 0,
       sheen: leather ? 0 : selectedFabric.weave === "velvet" ? 0.7 : selectedFabric.weave === "loop" ? 0.3 : 0.18,
@@ -913,7 +913,7 @@ export function SofaConfigurator() {
               {FABRICS.map((item) => (
                 <Button variant="ghost" key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-[72px] min-w-0 flex-col justify-start gap-1 rounded-md border bg-muted p-1 text-center", fabric === item.id ? "border-primary ring-1 ring-primary" : "border-border")}>
                    <FabricSwatch fabric={item} />
-                   <span className="w-full whitespace-normal text-[9px] leading-[11px]">{item.name}</span>
+                   <span className={cn("w-full whitespace-normal leading-[11px]", item.tufted ? "text-[7px]" : "text-[9px]")}>{item.name}</span>
                   {fabric === item.id && <span className="absolute right-1 top-1 flex size-3 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-2" /></span>}
                 </Button>
               ))}
