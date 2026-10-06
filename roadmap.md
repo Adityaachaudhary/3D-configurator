@@ -46,3 +46,7 @@
 ## Fuller Chesterfield padding
 - [x] Deepen rounded diamond padding and button pockets without reopening joins.
 - [x] Verify both finishes on all seating sizes and retained grain-scale control.
+## Clean Chesterfield edges and legs
+- [x] Stop tufting tearing across rolled edges, corners and wrinkled cushion borders.
+- [x] Remove upholstery colour and dark marks from the legs.
+- [x] Deepen padding and seam shading; verify Saddle and Oxblood on all sizes.
