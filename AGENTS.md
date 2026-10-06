@@ -15,3 +15,4 @@
 - Project neutral fabric and leg colour, relief, and roughness maps in physical coordinates rather than the imported UV atlas because replicated modules must retain consistent texture density and uninterrupted finishes.
 - Use one meter-based dimension formatter for ruler labels and panel metrics; keep height/depth rulers separate from width animation so unit changes never distort geometry.
 - Toggle wireframe by setting `material.wireframe` on the shared upholstery/leg materials (and chair clones) in an effect, so it applies uniformly across all derived seating modules.
+- Use OrbitControls' built-in zoom (zoomToCursor, minDistance 1.7, maxDistance 7) for wheel/pinch; keep the toolbar zoom buttons driving CameraRig's zoomSignal so both share the same distance limits.
