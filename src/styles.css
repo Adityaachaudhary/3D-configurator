@@ -70,6 +70,16 @@
 :root {
   --radius: 0.375rem;
   --panel-width: 20rem;
+  --fabric-oat: oklch(0.742 0.038 83);
+  --fabric-pearl: oklch(0.862 0.016 88);
+  --fabric-sage: oklch(0.599 0.023 141);
+  --fabric-clay: oklch(0.592 0.078 41);
+  --fabric-moss: oklch(0.439 0.026 155);
+  --fabric-ink: oklch(0.338 0.007 235);
+  --leg-oak: oklch(0.581 0.078 66);
+  --leg-walnut: oklch(0.349 0.046 45);
+  --leg-ebonized: oklch(0.246 0.004 128);
+  --leg-steel: oklch(0.632 0.006 123);
   --background: oklch(0.93 0.008 90);
   --foreground: oklch(0.23 0.018 145);
   --surface: oklch(0.985 0.004 90);
@@ -157,3 +167,14 @@
 
   button, input { letter-spacing: 0; }
 }
+
+.fabric-swatch[data-fabric="oat"] { background: var(--fabric-oat); }
+.fabric-swatch[data-fabric="pearl"] { background: var(--fabric-pearl); }
+.fabric-swatch[data-fabric="sage"] { background: var(--fabric-sage); }
+.fabric-swatch[data-fabric="clay"] { background: var(--fabric-clay); }
+.fabric-swatch[data-fabric="moss"] { background: var(--fabric-moss); }
+.fabric-swatch[data-fabric="ink"] { background: var(--fabric-ink); }
+.leg-swatch[data-leg="oak"] { background: var(--leg-oak); }
+.leg-swatch[data-leg="walnut"] { background: var(--leg-walnut); }
+.leg-swatch[data-leg="ebonized"] { background: var(--leg-ebonized); }
+.leg-swatch[data-leg="steel"] { background: var(--leg-steel); }

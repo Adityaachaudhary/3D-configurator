@@ -82,43 +82,86 @@ function formatDimension(meters: number, unit: Unit) {
   return `${(meters * factor).toFixed(unit === "mm" ? 0 : 1)} ${unit}`;
 }
 
-function createFabricTexture(color: string, weave: string, repeat: number) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  const context = canvas.getContext("2d");
-  if (!context) return new THREE.CanvasTexture(canvas);
-  context.fillStyle = color;
-  context.fillRect(0, 0, 256, 256);
-  context.globalAlpha = weave === "velvet" ? 0.08 : 0.2;
-  context.strokeStyle = "#ffffff";
-  context.lineWidth = weave === "loop" ? 1.4 : 0.7;
-  const gap = weave === "loop" ? 7 : 5;
-  for (let i = -256; i < 512; i += gap) {
-    context.beginPath();
-    if (weave === "twill") {
-      context.moveTo(i, 0);
-      context.lineTo(i - 256, 256);
-    } else {
-      context.moveTo(i, 0);
-      context.lineTo(i, 256);
+// Neutral microstructure keeps the selected colour from being multiplied twice.
+// All maps use the same physical projection, independent of the imported UV atlas.
+function createSurfaceMaps(kind: string) {
+  const size = 256;
+  const colour = new Uint8Array(size * size * 4);
+  const relief = new Uint8Array(size * size * 4);
+  const rough = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const u = x / size * Math.PI * 2;
+      const v = y / size * Math.PI * 2;
+      const noise = Math.sin(u * 73 + Math.sin(v * 41)) * Math.sin(v * 67 + Math.cos(u * 29));
+      let height: number;
+      if (kind === "wood") height = 0.5 + 0.28 * Math.sin(u * 18 + 1.6 * Math.sin(v * 2) + 0.5 * Math.sin(v * 5)) + noise * 0.06;
+      else if (kind === "steel") height = 0.5 + 0.2 * Math.sin(u * 95) + noise * 0.05;
+      else if (kind === "loop") height = 0.5 + 0.23 * Math.sin(u * 20 + Math.sin(v * 24)) * Math.cos(v * 24 + Math.sin(u * 20)) + noise * 0.1;
+      else if (kind === "velvet") height = 0.5 + noise * 0.12;
+      else {
+        const warp = Math.cos(u * 32);
+        const weft = Math.cos(v * 32);
+        const over = kind === "twill" ? Math.sin((u + v) * 8) : Math.sin(u * 16) * Math.sin(v * 16);
+        height = 0.5 + 0.22 * (over > 0 ? warp : weft) + noise * 0.06;
+      }
+      const i = (y * size + x) * 4;
+      const contrast = kind === "wood" ? 0.3 : kind === "velvet" ? 0.025 : 0.08;
+      const value = Math.round(255 * (0.94 + (height - 0.5) * contrast));
+      for (let k = 0; k < 3; k += 1) {
+        colour[i + k] = value;
+        relief[i + k] = Math.round(height * 255);
+        rough[i + k] = Math.round(255 * (0.88 + height * 0.12));
+      }
+      colour[i + 3] = relief[i + 3] = rough[i + 3] = 255;
     }
-    context.stroke();
   }
-  context.globalAlpha = weave === "velvet" ? 0.05 : 0.15;
-  context.strokeStyle = "#111111";
-  for (let i = 0; i < 256; i += gap) {
-    context.beginPath();
-    context.moveTo(0, i);
-    context.lineTo(256, weave === "twill" ? i + 256 : i);
-    context.stroke();
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(repeat, repeat);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-  return texture;
+  const make = (data: Uint8Array, srgb = false) => {
+    const texture = new THREE.DataTexture(data, size, size);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.generateMipmaps = true;
+    texture.anisotropy = 8;
+    if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  };
+  return { map: make(colour, true), bumpMap: make(relief), roughnessMap: make(rough) };
+}
+
+function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms["surfaceDensity"] = { value: density / scale };
+    shader.vertexShader = "varying vec3 surfacePosition; varying vec3 surfaceNormal;\n" + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace("#include <worldpos_vertex>", `#include <worldpos_vertex>
+      surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      surfaceNormal = normalize(mat3(modelMatrix) * normal);`);
+    shader.fragmentShader = `varying vec3 surfacePosition;
+      varying vec3 surfaceNormal;
+      uniform float surfaceDensity;
+      vec4 surfaceSample(sampler2D tex, vec3 p) {
+        vec3 weights = pow(abs(normalize(surfaceNormal)), vec3(6.0));
+        weights /= max(weights.x + weights.y + weights.z, 0.0001);
+        return texture2D(tex, p.yz * surfaceDensity) * weights.x
+          + texture2D(tex, p.xz * surfaceDensity) * weights.y
+          + texture2D(tex, p.xy * surfaceDensity) * weights.z;
+      }\n` + shader.fragmentShader;
+    // Three leaves these chunks unexpanded at onBeforeCompile time.
+    // Expand only the sampling chunks before replacing their UV lookups.
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <map_fragment>", THREE.ShaderChunk.map_fragment)
+      .replace("#include <roughnessmap_fragment>", THREE.ShaderChunk.roughnessmap_fragment)
+      .replace("#include <bumpmap_pars_fragment>", THREE.ShaderChunk.bumpmap_pars_fragment)
+      .replace("texture2D( map, vMapUv )", "surfaceSample(map, surfacePosition)")
+      .replace("texture2D( roughnessMap, vRoughnessMapUv )", "surfaceSample(roughnessMap, surfacePosition)")
+      .replace("vec2 dSTdx = dFdx( vBumpMapUv );", "vec3 dSTdx = dFdx(surfacePosition);")
+      .replace("vec2 dSTdy = dFdy( vBumpMapUv );", "vec3 dSTdy = dFdy(surfacePosition);")
+      .replace("texture2D( bumpMap, vBumpMapUv ).x", "surfaceSample(bumpMap, surfacePosition).x")
+      .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", "surfaceSample(bumpMap, surfacePosition + dSTdx).x")
+      .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", "surfaceSample(bumpMap, surfacePosition + dSTdy).x");
+  };
+  material.customProgramCacheKey = () => `physical-surface-v1-${density}-${scale}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
@@ -187,13 +230,14 @@ function splitSofaGeometry(source: THREE.BufferGeometry) {
     const centerX = indices.reduce((sum, index) => sum + position.getX(index), 0) / 3;
     const centerY = indices.reduce((sum, index) => sum + position.getY(index), 0) / 3;
     const centerZ = indices.reduce((sum, index) => sum + position.getZ(index), 0) / 3;
-    const isLeg = centerY < -0.275 && Math.abs(centerX) > 0.76 && Math.abs(centerZ) > 0.2;
+    const isLeg = centerY < -0.335 && Math.abs(centerX) > 0.76 && Math.abs(centerZ) > 0.2;
     (isLeg ? legs : fabric).push(...indices);
   }
   geometry.setIndex([...fabric, ...legs]);
   geometry.clearGroups();
   geometry.addGroup(0, fabric.length, 0);
   geometry.addGroup(fabric.length, legs.length, 1);
+  // The source export contains inconsistent normals on the feet; repair before clipping.
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -260,51 +304,45 @@ function sliceModule(source: THREE.BufferGeometry, min: number, max: number) {
   return result;
 }
 
-// Match the inserted module's cut to the original centre profile, not to the
-// arm-side profile at -MODULE_WIDTH. Those two profiles are not interchangeable.
-function joinedModule(source: THREE.BufferGeometry) {
-  const module = sliceModule(source, -MODULE_WIDTH, 0);
-  const positions = module.getAttribute("position");
-  const attributes = Object.entries(module.attributes);
-  const segments: Array<[number, number]> = [];
-  for (let i = 0; i < positions.count; i += 3) {
-    const edge = [i, i + 1, i + 2].filter((v) => Math.abs(positions.getX(v)) < 1e-6);
-    const [a, b] = edge;
-    if (a !== undefined && b !== undefined) segments.push([a, b]);
+// Reflect a cushion half around its crown. Both outer cuts are then the
+// exact original centre profile, without nearest-profile snapping or pinching.
+function reflectedGeometry(source: THREE.BufferGeometry) {
+  const result = source.clone();
+  const p = result.getAttribute("position");
+  const n = result.getAttribute("normal");
+  for (let i = 0; i < p.count; i += 1) {
+    p.setX(i, -p.getX(i));
+    n.setX(i, -n.getX(i));
   }
-  const original = module.clone();
-  const profile = original.getAttribute("position");
-  const blendWidth = 0.06;
-  for (let v = 0; v < positions.count; v += 1) {
-    const distance = positions.getX(v) + MODULE_WIDTH;
-    if (distance > blendWidth) continue;
-    let closest = Infinity;
-    let match: [number, number, number] | undefined;
-    for (const [a, b] of segments) {
-      const dy = profile.getY(b) - profile.getY(a);
-      const dz = profile.getZ(b) - profile.getZ(a);
-      const t = THREE.MathUtils.clamp(((positions.getY(v) - profile.getY(a)) * dy + (positions.getZ(v) - profile.getZ(a)) * dz) / (dy * dy + dz * dz || 1), 0, 1);
-      const y = THREE.MathUtils.lerp(profile.getY(a), profile.getY(b), t);
-      const z = THREE.MathUtils.lerp(profile.getZ(a), profile.getZ(b), t);
-      const squared = (positions.getY(v) - y) ** 2 + (positions.getZ(v) - z) ** 2;
-      if (squared < closest) { closest = squared; match = [a, b, t]; }
-    }
-    if (!match) continue;
-    const [a, b, t] = match;
-    const blend = 1 - THREE.MathUtils.smoothstep(Math.max(0, distance), 0, blendWidth);
-    for (const [name, attribute] of attributes) {
-      const reference = original.getAttribute(name);
-      for (let k = name === "position" ? 1 : 0; k < attribute.itemSize; k += 1) {
-        const target = THREE.MathUtils.lerp(reference.getComponent(a, k), reference.getComponent(b, k), t);
-        attribute.setComponent(v, k, THREE.MathUtils.lerp(attribute.getComponent(v, k), target, blend));
+  for (const attribute of Object.values(result.attributes)) {
+    for (let i = 0; i < attribute.count; i += 3) {
+      for (let k = 0; k < attribute.itemSize; k += 1) {
+        const value = attribute.getComponent(i + 1, k);
+        attribute.setComponent(i + 1, k, attribute.getComponent(i + 2, k));
+        attribute.setComponent(i + 2, k, value);
       }
-      attribute.needsUpdate = true;
     }
   }
-  original.dispose();
-  module.computeBoundingBox();
-  module.computeBoundingSphere();
-  return module;
+  result.computeBoundingSphere();
+  return result;
+}
+
+function softenMirrorPlane(geometry: THREE.BufferGeometry, plane: number) {
+  const positions = geometry.getAttribute("position");
+  const normals = geometry.getAttribute("normal");
+  const normal = new THREE.Vector3();
+  for (let i = 0; i < positions.count; i += 1) {
+    const blend = THREE.MathUtils.smoothstep(Math.abs(positions.getX(i) - plane), 0, 0.025);
+    normal.set(normals.getX(i) * blend, normals.getY(i), normals.getZ(i)).normalize();
+    normals.setXYZ(i, normal.x, normal.y, normal.z);
+  }
+}
+
+function joinedModule(source: THREE.BufferGeometry) {
+  const half = sliceModule(source, -MODULE_WIDTH / 2, 0);
+  half.translate(MODULE_WIDTH / 2, 0, 0);
+  softenMirrorPlane(half, 0);
+  return [reflectedGeometry(half), half];
 }
 
 function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: { fabric: FabricId; leg: LegId; textureScale: number; scale: number; seats: SeatCount; reducedMotion: boolean }) {
@@ -325,7 +363,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: {
     sliceModule(geometry, MODULE_WIDTH, Infinity),
     sliceModule(geometry, -MODULE_WIDTH, 0),
     sliceModule(geometry, 0, MODULE_WIDTH),
-    joinedModule(geometry),
+    ...joinedModule(geometry),
   ] : [], [geometry]);
   const chairHalf = useMemo(() => {
     if (!geometry) return null;
@@ -337,15 +375,23 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: {
       positions.setX(i, (x > -MODULE_WIDTH ? -MODULE_WIDTH + (x + MODULE_WIDTH) * 2 : x) + MODULE_WIDTH / 2);
     }
     positions.needsUpdate = true;
-    half.computeVertexNormals();
+    const normals = half.getAttribute("normal");
+    const normal = new THREE.Vector3();
+    for (let i = 0; i < positions.count; i += 1) {
+      const stretched = positions.getX(i) > -MODULE_WIDTH / 2;
+      normal.set(normals.getX(i) / (stretched ? 2 : 1), normals.getY(i), normals.getZ(i)).normalize();
+      normals.setXYZ(i, normal.x, normal.y, normal.z);
+    }
+    softenMirrorPlane(half, 0);
     half.computeBoundingSphere();
     return half;
   }, [geometry]);
-  useEffect(() => () => chairHalf?.dispose(), [chairHalf]);
+  const chairOtherHalf = useMemo(() => chairHalf ? reflectedGeometry(chairHalf) : null, [chairHalf]);
+  useEffect(() => () => { chairHalf?.dispose(); chairOtherHalf?.dispose(); }, [chairHalf, chairOtherHalf]);
   useEffect(() => () => { geometry?.dispose(); modules.forEach((module) => module.dispose()); }, [geometry, modules]);
   useFrame((_, rawDelta) => {
     if (!assembly.current) return;
-    const n = reducedMotion ? seats : THREE.MathUtils.damp(animatedSeats.current, seats, 14, Math.min(rawDelta, 0.25));
+    const n = reducedMotion ? seats : THREE.MathUtils.damp(animatedSeats.current, seats, 14, Math.min(rawDelta, 0.05));
     animatedSeats.current = Math.abs(n - seats) < 0.001 ? seats : n;
     const current = Math.max(2, animatedSeats.current);
     const chairBlend = THREE.MathUtils.clamp(2 - animatedSeats.current, 0, 1);
@@ -383,32 +429,43 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: {
   const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
   const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
   const fabricTexture = useMemo(
-    () => createFabricTexture(selectedFabric.color, selectedFabric.weave, textureScale),
-    [selectedFabric, textureScale],
+    () => createSurfaceMaps(selectedFabric.weave),
+    [selectedFabric.weave],
   );
-  useEffect(() => () => fabricTexture.dispose(), [fabricTexture]);
+  const legTexture = useMemo(() => createSurfaceMaps(leg === "steel" ? "steel" : "wood"), [leg]);
+  useEffect(() => () => Object.values(fabricTexture).forEach((map) => map.dispose()), [fabricTexture]);
+  useEffect(() => () => Object.values(legTexture).forEach((map) => map.dispose()), [legTexture]);
   const materials = useMemo(() => {
     const upholstery = new THREE.MeshPhysicalMaterial({
       color: selectedFabric.color,
-      map: fabricTexture,
+      ...fabricTexture,
+      bumpScale: selectedFabric.weave === "loop" ? 0.00065 : selectedFabric.weave === "velvet" ? 0.00008 : 0.0003,
       roughness: selectedFabric.weave === "velvet" ? 0.78 : 0.91,
       metalness: 0,
-      sheen: selectedFabric.weave === "velvet" ? 0.55 : 0.18,
-      sheenColor: new THREE.Color(selectedFabric.color),
+      sheen: selectedFabric.weave === "velvet" ? 0.7 : selectedFabric.weave === "loop" ? 0.3 : 0.18,
+      sheenColor: new THREE.Color(selectedFabric.color).lerp(new THREE.Color(1, 1, 1), 0.35),
       sheenRoughness: 0.85,
     });
     const feet = new THREE.MeshStandardMaterial({
       color: selectedLeg.color,
+      ...legTexture,
+      bumpScale: leg === "steel" ? 0.000008 : 0.000025,
       roughness: selectedLeg.roughness,
       metalness: selectedLeg.metalness,
     });
+    projectSurface(upholstery, textureScale * 0.8, scale);
+    projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
-  }, [fabricTexture, selectedFabric, selectedLeg]);
-  const chairMaterials = useMemo(() => materials.map((material) => material.clone()), [materials]);
+  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg]);
+  const chairMaterials = useMemo(() => materials.map((material, i) => {
+    const clone = material.clone();
+    projectSurface(clone, i === 0 ? textureScale * 0.8 : leg === "steel" ? 3 : 1.6, scale);
+    return clone;
+  }), [materials, textureScale, leg, scale]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
   useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
-  const [leftCap, rightCap, leftSeat, rightSeat, insertSeat] = modules;
-  if (!geometry || !chairHalf || !leftCap || !rightCap || !leftSeat || !rightSeat || !insertSeat) return null;
+  const [leftCap, rightCap, leftSeat, rightSeat, insertLeft, insertRight] = modules;
+  if (!geometry || !chairHalf || !chairOtherHalf || !leftCap || !rightCap || !leftSeat || !rightSeat || !insertLeft || !insertRight) return null;
   return (
     <>
     <group ref={assembly} name="sofa-assembly" scale={scale} position={[0, 0.396396 * scale + 0.015, 0]} dispose={null}>
@@ -416,11 +473,11 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: {
       <mesh geometry={rightCap} material={materials} castShadow receiveShadow />
       <mesh geometry={leftSeat} material={materials} castShadow receiveShadow />
       <group><mesh geometry={rightSeat} material={materials} position-x={-MODULE_WIDTH / 2} castShadow receiveShadow /></group>
-      <group><mesh geometry={insertSeat} material={materials} position-x={MODULE_WIDTH / 2} castShadow receiveShadow /></group>
+      <group><mesh geometry={insertLeft} material={materials} castShadow receiveShadow /><mesh geometry={insertRight} material={materials} castShadow receiveShadow /></group>
     </group>
     <group ref={chair} name="chair-assembly" scale={scale} position={[0, 0.396396 * scale + 0.015, 0]} dispose={null}>
       <mesh geometry={chairHalf} material={chairMaterials} castShadow receiveShadow />
-      <mesh geometry={chairHalf} material={chairMaterials} scale-x={-1} castShadow receiveShadow />
+      <mesh geometry={chairOtherHalf} material={chairMaterials} castShadow receiveShadow />
     </group>
     </>
   );
@@ -665,10 +722,10 @@ export function SofaConfigurator() {
             <div className="flex items-end justify-between"><div><h2 className="text-[13px] font-semibold">Upholstery</h2><p className="mt-0.5 text-[11px] text-muted-foreground">{selectedFabric.family}</p></div><span className="text-[11px] font-medium">{selectedFabric.name}</span></div>
             <div className="mt-2 grid grid-cols-6 gap-1.5">
               {FABRICS.map((item) => (
-                <button key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-9 rounded-md border bg-muted p-1 text-left", fabric === item.id ? "border-primary ring-1 ring-primary" : "border-border")}>
-                  <span className="block h-full rounded-[3px]" style={{ backgroundColor: item.color }} />
+                <Button variant="ghost" key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-9 rounded-md border bg-muted p-1 text-left", fabric === item.id ? "border-primary ring-1 ring-primary" : "border-border")}>
+                  <span data-fabric={item.id} className="fabric-swatch block h-full w-full rounded-[3px]" />
                   {fabric === item.id && <span className="absolute right-1 top-1 flex size-3 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-2" /></span>}
-                </button>
+                </Button>
               ))}
             </div>
             <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">Weave scale</span><span className="font-mono text-muted-foreground">{textureScale}×</span></span><input className="mt-2 w-full accent-primary" type="range" min="3" max="14" step="1" value={textureScale} onChange={(event) => setTextureScale(Number(event.target.value))} /></label>
@@ -678,9 +735,9 @@ export function SofaConfigurator() {
             <div className="flex items-end justify-between"><div><h2 className="text-[13px] font-semibold">Leg finish</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Frame details</p></div><span className="text-[11px] font-medium">{selectedLeg.name}</span></div>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               {LEGS.map((item) => (
-                <button key={item.id} type="button" onClick={() => setLeg(item.id)} aria-pressed={leg === item.id} className={cn("flex h-9 items-center gap-2 rounded-md border px-2 text-left text-[11px] font-medium", leg === item.id ? "border-primary bg-accent" : "border-border bg-surface")}>
-                  <span className="size-4 shrink-0 rounded-[3px] border border-border" style={{ backgroundColor: item.color }} />{item.name}{leg === item.id && <Check className="ml-auto size-3" />}
-                </button>
+                <Button variant="ghost" key={item.id} type="button" onClick={() => setLeg(item.id)} aria-pressed={leg === item.id} className={cn("flex h-9 items-center gap-2 rounded-md border px-2 text-left text-[11px] font-medium", leg === item.id ? "border-primary bg-accent" : "border-border bg-surface")}>
+                  <span data-leg={item.id} className="leg-swatch size-4 shrink-0 rounded-[3px] border border-border" />{item.name}{leg === item.id && <Check className="ml-auto size-3" />}
+                </Button>
               ))}
             </div>
           </section>

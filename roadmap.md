@@ -8,3 +8,7 @@
 ## Compact configuration panel
 - [x] Shrink fabric swatches and tighten panel spacing and type sizes.
 - [x] Verify panel width, collapse behaviour, and that controls still work.
+## Finish and model quality
+- [x] Refine fabric relief, sheen, and leg surface finishes.
+- [x] Improve one- and three-seater geometry without duplication artifacts.
+- [x] Verify all seating sizes, finishes, joins, and measurements in the viewer.
