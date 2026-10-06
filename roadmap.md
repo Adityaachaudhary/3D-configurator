@@ -43,3 +43,6 @@
 - [x] Reduce displacement cracks and sharp diamond ridges while retaining padded depth.
 - [x] Refine recessed buttons, leather highlights, and matching swatch profiles.
 - [x] Verify all sizes and both finishes, grain adjustment, and ordinary upholstery restoration.
+## Fuller Chesterfield padding
+- [ ] Deepen rounded diamond padding and button pockets without reopening joins.
+- [ ] Verify both finishes on all seating sizes and retained grain-scale control.

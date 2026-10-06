@@ -119,12 +119,12 @@ function createSurfaceMaps(kind: string) {
       else if (kind === "tuft") {
         const a = (x / size + y / size) % 1;
         const b = ((x / size - y / size) % 1 + 1) % 1;
-        const crown = Math.pow(Math.max(0, Math.sin(a * Math.PI) * Math.sin(b * Math.PI)), 1.4);
+        const crown = Math.pow(Math.max(0, Math.sin(a * Math.PI) * Math.sin(b * Math.PI)), 1.1);
         const edgeA = Math.min(a, 1 - a), edgeB = Math.min(b, 1 - b);
         const radius = edgeA * edgeA + edgeB * edgeB;
-        const pocket = Math.exp(-radius / 0.0032);
-        const buttonHead = Math.exp(-radius / 0.00022);
-        height = Math.max(0, 0.45 + crown * 0.55 - pocket * 0.28 + buttonHead * 0.12);
+        const pocket = Math.exp(-radius / 0.0042);
+        const buttonHead = Math.exp(-radius / 0.0003);
+        height = Math.max(0, 0.40 + crown * 0.60 - pocket * 0.30 + buttonHead * 0.12);
       }
       else {
         const warp = Math.cos(u * 32);
@@ -236,8 +236,8 @@ const tuftProfileGLSL = `
     vec2 cell = fract(vec2(uv.x + uv.y, uv.x - uv.y));
     vec2 edge = min(cell, 1.0 - cell);
     float r = dot(edge, edge);
-    float crown = pow(max(0.0, sin(cell.x * 3.14159265) * sin(cell.y * 3.14159265)), 1.4);
-    return max(0.0, 0.45 + 0.55 * crown - 0.28 * exp(-r / 0.0032) + 0.12 * exp(-r / 0.00022));
+    float crown = pow(max(0.0, sin(cell.x * 3.14159265) * sin(cell.y * 3.14159265)), 1.1);
+    return max(0.0, 0.40 + 0.60 * crown - 0.30 * exp(-r / 0.0042) + 0.12 * exp(-r / 0.0003));
   }
 `;
 
@@ -247,7 +247,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     if (tuft) {
       shader.uniforms["tuftMap"] = { value: tuft };
       shader.uniforms["tuftDensity"] = { value: 4.5 / scale };
-      shader.uniforms["tuftDepth"] = { value: 0.004 * scale };
+      shader.uniforms["tuftDepth"] = { value: 0.005 * scale };
     }
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
@@ -315,7 +315,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         vec3 paddingR1 = cross(paddingDy, normal);
         vec3 paddingR2 = cross(normal, paddingDx);
         float paddingDet = dot(paddingDx, paddingR1);
-        float paddingHeight = (tuftHeight(surfacePosition) * 0.014 + surfaceSample(bumpMap, surfacePosition).r * 0.00045) * ${scale.toFixed(6)};
+        float paddingHeight = (tuftHeight(surfacePosition) * 0.022 + surfaceSample(bumpMap, surfacePosition).r * 0.00045) * ${scale.toFixed(6)};
         vec3 paddingGradient = sign(paddingDet) * (dFdx(paddingHeight) * paddingR1 + dFdy(paddingHeight) * paddingR2);
         normal = normalize(abs(paddingDet) * normal - paddingGradient);
       `);
@@ -346,7 +346,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v10-supple-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
+  material.customProgramCacheKey = () => `physical-surface-v11-fuller-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
