@@ -119,7 +119,7 @@ function createSurfaceMaps(kind: string) {
       else if (kind === "tuft") {
         const a = (x / size + y / size) % 1;
         const b = ((x / size - y / size) % 1 + 1) % 1;
-        const crown = Math.pow(Math.max(0, Math.sin(a * Math.PI) * Math.sin(b * Math.PI)), 1.1);
+        const crown = Math.pow(Math.max(0, Math.sin(a * Math.PI) * Math.sin(b * Math.PI)), 1.6);
         const edgeA = Math.min(a, 1 - a), edgeB = Math.min(b, 1 - b);
         const radius = edgeA * edgeA + edgeB * edgeB;
         const pocket = Math.exp(-radius / 0.0042);
@@ -236,7 +236,7 @@ const tuftProfileGLSL = `
     vec2 cell = fract(vec2(uv.x + uv.y, uv.x - uv.y));
     vec2 edge = min(cell, 1.0 - cell);
     float r = dot(edge, edge);
-    float crown = pow(max(0.0, sin(cell.x * 3.14159265) * sin(cell.y * 3.14159265)), 1.1);
+    float crown = pow(max(0.0, sin(cell.x * 3.14159265) * sin(cell.y * 3.14159265)), 1.6);
     return max(0.0, 0.40 + 0.60 * crown - 0.30 * exp(-r / 0.0042) + 0.12 * exp(-r / 0.0003));
   }
 `;
