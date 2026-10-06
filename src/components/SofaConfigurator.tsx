@@ -578,8 +578,8 @@ function CameraRig({ controlsRef, view, zoomSignal, seats, scale, reducedMotion 
   return null;
 }
 
-function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate, studio, view, zoomSignal, seats, reducedMotion }: {
-  fabric: FabricId; leg: LegId; textureScale: number; scale: number; grid: boolean; measures: boolean; unit: Unit; rotate: boolean; studio: boolean; view: ViewName; zoomSignal: number; seats: SeatCount; reducedMotion: boolean;
+function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate, studio, view, zoomSignal, seats, reducedMotion, wireframe }: {
+  fabric: FabricId; leg: LegId; textureScale: number; scale: number; grid: boolean; measures: boolean; unit: Unit; rotate: boolean; studio: boolean; view: ViewName; zoomSignal: number; seats: SeatCount; reducedMotion: boolean; wireframe: boolean;
 }) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   return (
@@ -643,6 +643,7 @@ export function SofaConfigurator() {
   const [measures, setMeasures] = useState(true);
   const [rotate, setRotate] = useState(false);
   const [studio, setStudio] = useState(true);
+  const [wireframe, setWireframe] = useState(false);
   const [unit, setUnit] = useState<Unit>("cm");
   const [view, setView] = useState<ViewName>("perspective");
   const [zoomSignal, setZoomSignal] = useState(0);
