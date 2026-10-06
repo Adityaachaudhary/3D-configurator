@@ -116,7 +116,7 @@ function createSurfaceMaps(kind: string) {
         height = 0.5 + 0.22 * (over > 0 ? warp : weft) + noise * 0.06;
       }
       const i = (y * size + x) * 4;
-      const contrast = kind === "wood" ? 0.3 : kind === "velvet" ? 0.025 : 0.08;
+      const contrast = kind === "wood" ? 0.3 : kind === "velvet" ? 0.12 : 0.35;
       const value = Math.round(255 * (0.94 + (height - 0.5) * contrast));
       for (let k = 0; k < 3; k += 1) {
         colour[i + k] = value;
@@ -183,11 +183,29 @@ function createPatternCanvas(fabric: FabricPreset) {
 function FabricSwatch({ fabric }: { fabric: FabricPreset }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    if (!fabric.pattern || !canvas.current) return;
+    if (!canvas.current) return;
     const ctx = canvas.current.getContext("2d");
-    ctx?.drawImage(createPatternCanvas(fabric), 0, 0, 64, 64);
+    if (!ctx) return;
+    if (fabric.pattern) {
+      const artwork = createPatternCanvas(fabric);
+      for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) ctx.drawImage(artwork, x * 64, y * 64, 64, 64);
+    } else {
+      const maps = createSurfaceMaps(fabric.weave);
+      const data = maps.map.image.data;
+      const image = ctx.createImageData(192, 192);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(`--fabric-${fabric.id}`).trim();
+      ctx.fillRect(0, 0, 1, 1);
+      const color = ctx.getImageData(0, 0, 1, 1).data;
+      for (let i = 0; i < 192 * 192; i++) {
+        const source = ((Math.floor(i / 192) * 256 + i % 192) * 4);
+        for (let k = 0; k < 3; k++) image.data[i * 4 + k] = (color[k] ?? 0) * (data?.[source] ?? 255) / 255;
+        image.data[i * 4 + 3] = 255;
+      }
+      ctx.putImageData(image, 0, 0);
+      Object.values(maps).forEach((map) => map.dispose());
+    }
   }, [fabric]);
-  return fabric.pattern ? <canvas ref={canvas} width={64} height={64} aria-hidden="true" className="block h-full w-full rounded-[3px]" /> : <span data-fabric={fabric.id} className="fabric-swatch block h-full w-full rounded-[3px]" />;
+  return <span className="relative block h-9 w-full shrink-0 overflow-hidden rounded-[3px]"><canvas ref={canvas} width={192} height={192} aria-hidden="true" className="absolute inset-0 block h-full w-full" /></span>;
 }
 
 function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null) {
@@ -195,7 +213,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     shader.uniforms["surfaceDensity"] = { value: density / scale };
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
-      shader.uniforms["patternDensity"] = { value: 8 / scale };
+      shader.uniforms["patternDensity"] = { value: density * (8 / 5.6) / scale };
     }
     shader.vertexShader = "varying vec3 surfacePosition; varying vec3 surfaceNormal;\n" + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace("#include <worldpos_vertex>", `#include <worldpos_vertex>
@@ -565,13 +583,13 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       roughness: selectedLeg.roughness,
       metalness: selectedLeg.metalness,
     });
-    projectSurface(upholstery, textureScale * 0.8, scale, patternTexture);
+    projectSurface(upholstery, 5.6 * 7 / textureScale, scale, patternTexture);
     projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
   }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture]);
   const chairMaterials = useMemo(() => materials.map((material, i) => {
     const clone = material.clone();
-    projectSurface(clone, i === 0 ? textureScale * 0.8 : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null);
+    projectSurface(clone, i === 0 ? 5.6 * 7 / textureScale : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null);
     return clone;
   }), [materials, textureScale, leg, scale, patternTexture]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
@@ -843,13 +861,14 @@ export function SofaConfigurator() {
             <div className="flex items-end justify-between"><div><h2 className="text-[13px] font-semibold">Upholstery</h2><p className="mt-0.5 text-[11px] text-muted-foreground">{selectedFabric.family}</p></div><span className="text-[11px] font-medium">{selectedFabric.name}</span></div>
             <div className="mt-2 grid grid-cols-6 gap-1.5">
               {FABRICS.map((item) => (
-                <Button variant="ghost" key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-9 rounded-md border bg-muted p-1 text-left", fabric === item.id ? "border-primary ring-1 ring-primary" : "border-border")}>
+                <Button variant="ghost" key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-[72px] min-w-0 flex-col justify-start gap-1 rounded-md border bg-muted p-1 text-center", fabric === item.id ? "border-primary ring-1 ring-primary" : "border-border")}>
                    <FabricSwatch fabric={item} />
+                   <span className="w-full whitespace-normal text-[9px] leading-[11px]">{item.name}</span>
                   {fabric === item.id && <span className="absolute right-1 top-1 flex size-3 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-2" /></span>}
                 </Button>
               ))}
             </div>
-            <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">Weave scale</span><span className="font-mono text-muted-foreground">{textureScale}×</span></span><input className="mt-2 w-full accent-primary" type="range" min="3" max="14" step="1" value={textureScale} onChange={(event) => setTextureScale(Number(event.target.value))} /></label>
+            <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">Weave scale</span><span className="font-mono text-muted-foreground">{textureScale}×</span></span><input aria-label="Weave scale" className="mt-2 w-full accent-primary" type="range" min="3" max="14" step="1" value={textureScale} onChange={(event) => setTextureScale(Number(event.target.value))} /></label>
           </section>
           <div className="my-4 h-px bg-border" />
           <section>
