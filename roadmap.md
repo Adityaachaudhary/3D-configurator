@@ -50,3 +50,5 @@
 - [x] Stop tufting tearing across rolled edges, corners and wrinkled cushion borders.
 - [x] Remove upholstery colour and dark marks from the legs.
 - [x] Deepen padding and seam shading; verify Saddle and Oxblood on all sizes.
+## Restore Chesterfield bounce
+- [x] Re-extend deep padding across seats, back cushions and sides while keeping edges clean.
