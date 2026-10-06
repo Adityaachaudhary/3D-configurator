@@ -521,7 +521,7 @@ function tuftPanelFrame(position: THREE.BufferAttribute | THREE.InterleavedBuffe
   let mask = smooth.map((v, i) => {
     const a = Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z));
     const panel = THREE.MathUtils.smoothstep(a, 0.82, 0.94);
-    const wrinkle = 1 - THREE.MathUtils.smoothstep(1 - (raw[i]?.dot(v) ?? 1), 0.035, 0.12);
+    const wrinkle = 1 - THREE.MathUtils.smoothstep(1 - (raw[i]?.dot(v) ?? 1), 0.06, 0.18);
     const welt = THREE.MathUtils.smoothstep(heights[i] ?? 0, -0.305, -0.265);
     return onFabric[i] ? panel * wrinkle * welt : 0;
   });
