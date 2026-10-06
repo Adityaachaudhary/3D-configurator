@@ -38,4 +38,4 @@
 - [x] Verify all seating sizes and leather scale endpoints.
 ## Chesterfield padded depth correction
 - [x] Form genuine recessed diamond seams and button pockets rather than shading alone.
-- [ ] Verify both Chesterfield finishes on all seating sizes, ordinary leather restoration, and unchanged measurements.
+- [x] Verify both Chesterfield finishes on all seating sizes, ordinary leather restoration, and unchanged measurements.
