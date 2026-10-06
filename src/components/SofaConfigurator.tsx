@@ -394,16 +394,15 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     return half;
   }, [geometry]);
   const chairOtherHalf = useMemo(() => chairHalf ? reflectedGeometry(chairHalf) : null, [chairHalf]);
-  const chairWidth = useMemo(() => {
-    if (!chairHalf) return 0;
+  const chairBounds = useMemo(() => {
+    if (!chairHalf) return null;
     chairHalf.computeBoundingBox();
-    const bounds = chairHalf.boundingBox;
-    return bounds ? Math.max(Math.abs(bounds.min.x), Math.abs(bounds.max.x)) * 2 : 0;
+    return chairHalf.boundingBox?.clone() ?? null;
   }, [chairHalf]);
   useEffect(() => () => { chairHalf?.dispose(); chairOtherHalf?.dispose(); }, [chairHalf, chairOtherHalf]);
   useEffect(() => () => { geometry?.dispose(); modules.forEach((module) => module.dispose()); }, [geometry, modules]);
   useFrame((_, rawDelta) => {
-    if (!assembly.current || !sourceBounds || chairWidth <= 0) return;
+    if (!assembly.current || !sourceBounds || !chairBounds) return;
     const n = reducedMotion ? seats : THREE.MathUtils.damp(animatedSeats.current, seats, 14, Math.min(rawDelta, 0.05));
     animatedSeats.current = Math.abs(n - seats) < 0.001 ? seats : n;
     const current = Math.max(2, animatedSeats.current);
@@ -421,8 +420,13 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     if (chair.current) {
       chair.current.visible = chairBlend > 0.001;
       const reveal = 0.95 + chairBlend * 0.05;
-      chair.current.scale.set(seatingWidth(1) / chairWidth * scale * reveal, sy * reveal, sz * reveal);
-      chair.current.position.set(0, 0.015 - sourceBounds.min.y * sy * reveal, -sourceCenter.z * sz * reveal);
+      const chairSize = chairBounds.getSize(new THREE.Vector3());
+      const chairCenter = chairBounds.getCenter(new THREE.Vector3());
+      const chairWidth = Math.max(Math.abs(chairBounds.min.x), Math.abs(chairBounds.max.x)) * 2;
+      const chairSy = BASE_SIZE.height / chairSize.y * scale * reveal;
+      const chairSz = BASE_SIZE.depth / chairSize.z * scale * reveal;
+      chair.current.scale.set(seatingWidth(1) / chairWidth * scale * reveal, chairSy, chairSz);
+      chair.current.position.set(0, 0.015 - chairBounds.min.y * chairSy, -chairCenter.z * chairSz);
     }
     for (const material of materials) {
       material.opacity = 1 - chairBlend;
