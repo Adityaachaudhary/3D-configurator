@@ -247,7 +247,7 @@ const tuftProfileGLSL = `
   }
   float tuftPanelMask(vec3 n) {
     vec3 a = abs(n);
-    return smoothstep(0.74, 0.86, max(a.x, max(a.y, a.z)));
+    return smoothstep(0.64, 0.78, max(a.x, max(a.y, a.z)));
   }
 `;
 
@@ -257,7 +257,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     if (tuft) {
       shader.uniforms["tuftMap"] = { value: tuft };
       shader.uniforms["tuftDensity"] = { value: 4.5 / scale };
-      shader.uniforms["tuftDepth"] = { value: 0.009 * scale };
+      shader.uniforms["tuftDepth"] = { value: 0.013 * scale };
     }
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
@@ -338,7 +338,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         vec3 paddingR1 = cross(paddingDy, normal);
         vec3 paddingR2 = cross(normal, paddingDx);
         float paddingDet = dot(paddingDx, paddingR1);
-        float paddingHeight = (tuftShade * 0.032 + surfaceSample(bumpMap, surfacePosition).r * 0.00045) * ${scale.toFixed(6)};
+        float paddingHeight = (tuftShade * 0.042 + surfaceSample(bumpMap, surfacePosition).r * 0.00045) * ${scale.toFixed(6)};
         vec3 paddingGradient = sign(paddingDet) * (dFdx(paddingHeight) * paddingR1 + dFdy(paddingHeight) * paddingR2);
         normal = normalize(abs(paddingDet) * normal - paddingGradient);
       `);
@@ -369,7 +369,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v14-panel-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
+  material.customProgramCacheKey = () => `physical-surface-v15-bouncy-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
@@ -520,8 +520,8 @@ function tuftPanelFrame(position: THREE.BufferAttribute | THREE.InterleavedBuffe
   }
   let mask = smooth.map((v, i) => {
     const a = Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z));
-    const panel = THREE.MathUtils.smoothstep(a, 0.82, 0.94);
-    const wrinkle = 1 - THREE.MathUtils.smoothstep(1 - (raw[i]?.dot(v) ?? 1), 0.06, 0.18);
+    const panel = THREE.MathUtils.smoothstep(a, 0.70, 0.84);
+    const wrinkle = 1 - THREE.MathUtils.smoothstep(1 - (raw[i]?.dot(v) ?? 1), 0.16, 0.36);
     const welt = THREE.MathUtils.smoothstep(heights[i] ?? 0, -0.305, -0.265);
     return onFabric[i] ? panel * wrinkle * welt : 0;
   });
