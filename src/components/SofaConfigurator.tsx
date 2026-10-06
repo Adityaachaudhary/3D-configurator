@@ -1052,7 +1052,7 @@ export function SofaConfigurator() {
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
       <div className="absolute inset-0 sm:right-[var(--panel-width)]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} wireframe={wireframe} />{measures && (["width", "height", "depth"] as const).map((axis) => <span key={axis} data-dimension={axis} className="pointer-events-none absolute left-0 top-0 z-10 whitespace-nowrap rounded-sm bg-dimension px-1.5 py-0.5 font-mono text-[11px] text-dimension-foreground" />)}</div>
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between border-b border-border/80 bg-surface/95 px-4 sm:px-6">
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between border-b border-border/60 bg-surface px-4 sm:px-6">
         <div className="pointer-events-auto flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground"><Box className="size-4" /></div>
           <div><div className="font-display text-base font-semibold leading-none">Panache</div><div className="mt-1 text-[10px] font-semibold uppercase text-muted-foreground">Product configurator</div></div>
@@ -1065,7 +1065,7 @@ export function SofaConfigurator() {
         </div>
       </header>
 
-      <nav aria-label="Viewer controls" className="absolute left-3 top-20 z-20 flex flex-col gap-2 sm:left-5">
+      <nav aria-label="Viewer controls" className="absolute left-3 top-20 z-20 flex flex-col gap-2 rounded-md border border-border/60 bg-surface p-1.5 shadow-panel sm:left-5">
         <ToolButton label="Zoom in" onClick={() => setZoomSignal((value) => value >= 0 ? value + 1 : 1)}><Plus className="size-4" /></ToolButton>
         <ToolButton label="Zoom out" onClick={() => setZoomSignal((value) => value <= 0 ? value - 1 : -1)}><Minus className="size-4" /></ToolButton>
         <ToolButton label="Fit to view" onClick={() => { setView("perspective"); setZoomSignal(0); }}><Scan className="size-4" /></ToolButton>
@@ -1077,7 +1077,7 @@ export function SofaConfigurator() {
         <ToolButton label="Toggle wireframe" active={wireframe} onClick={() => setWireframe((value) => !value)}><Frame className="size-4" /></ToolButton>
       </nav>
 
-      <section className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 sm:left-[calc((100%_-_var(--panel-width))/_2)] rounded-md border border-border bg-surface/95 p-1 shadow-panel sm:bottom-5">
+      <section className="absolute bottom-16 left-1/2 z-20 -translate-x-1/2 sm:left-[calc((100%_-_var(--panel-width))/_2)] rounded-md border border-border/60 bg-surface p-1 shadow-panel sm:bottom-5">
         <div className="flex items-center gap-1" role="group" aria-label="View presets">
           {(["perspective", "front", "side", "rear"] as ViewName[]).map((item) => (
             <Button key={item} variant={view === item ? "selected" : "ghost"} size="sm" onClick={() => setView(item)} className="capitalize">{item}</Button>
@@ -1089,8 +1089,8 @@ export function SofaConfigurator() {
         <Button variant="ghost" type="button" aria-expanded={panelOpen} className="flex h-13 w-full items-center justify-between border-b border-border px-4 text-left sm:hidden" onClick={() => setPanelOpen((value) => !value)}>
           <span className="text-sm font-semibold">Configure sofa · {seats} seater</span><ChevronDown className={cn("size-4 transition-transform", panelOpen && "rotate-180")} />
         </Button>
-        <div className="h-[calc(100%_-_3.25rem)] overflow-y-auto px-4 pb-24 pt-4 sm:h-full sm:pb-6">
-          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-0.5 font-display text-lg font-semibold leading-none">Make it yours</h1></div><Move3D className="size-4 text-muted-foreground" /></div>
+        <div className="configuration-scroll h-[calc(100%_-_3.25rem)] overflow-y-auto px-4 pb-24 pt-5 sm:h-full sm:pb-6">
+          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-1 font-display text-xl font-semibold leading-tight">Make it yours</h1></div><Move3D className="size-4 text-muted-foreground" /></div>
           <section className="mt-4" aria-labelledby="seating-heading">
             <div className="flex items-center justify-between"><h2 id="seating-heading" className="text-[13px] font-semibold">Seating</h2><span className="text-[11px] text-muted-foreground">{seats} seater</span></div>
             <div className="mt-2 grid grid-cols-3 gap-1.5" role="group" aria-label="Seating options">
@@ -1106,16 +1106,23 @@ export function SofaConfigurator() {
           </section>
           <div className="my-4 h-px bg-border" />
           <section>
-            <div className="flex items-end justify-between"><div><h2 className="text-[13px] font-semibold">Upholstery</h2><p className="mt-0.5 text-[11px] text-muted-foreground">{selectedFabric.family}</p></div><span className="text-[11px] font-medium">{selectedFabric.name}</span></div>
-            <div className="mt-2 grid grid-cols-6 gap-1.5">
-              {FABRICS.map((item) => (
-                <Button variant="ghost" key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-[72px] min-w-0 flex-col justify-start gap-1 rounded-md border bg-muted p-1 text-center", fabric === item.id ? "border-primary ring-1 ring-primary" : "border-border")}>
+            <div className="flex items-start justify-between gap-2"><div className="min-w-0"><h2 className="text-[13px] font-semibold">Upholstery</h2><p className="mt-0.5 text-[10px] text-muted-foreground">{selectedFabric.family}</p></div><span className="max-w-[126px] text-right text-[10px] font-semibold leading-4">{selectedFabric.name}</span></div>
+            {([
+              { label: "Solids", items: FABRICS.filter((item) => !item.pattern && item.weave !== "leather") },
+              { label: "Patterns", items: FABRICS.filter((item) => item.pattern) },
+              { label: "Leather & Chesterfield", items: FABRICS.filter((item) => item.weave === "leather") },
+            ]).map((group) => <div key={group.label} className="mt-2.5">
+              <p className="mb-1.5 text-[9px] font-semibold text-muted-foreground">{group.label}</p>
+              <div className="grid grid-cols-6 gap-1.5">
+              {group.items.map((item) => (
+                <Button variant="ghost" key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-[70px] min-w-0 flex-col justify-start gap-1 rounded-sm border p-0.5 text-center", fabric === item.id ? "border-primary bg-accent/40 ring-1 ring-primary" : "border-transparent bg-surface")}>
                    <FabricSwatch fabric={item} />
-                   <span className={cn("w-full whitespace-normal leading-[11px]", item.tufted ? "text-[7px]" : "text-[9px]")}>{item.name}</span>
+                   <span className={cn("w-full whitespace-normal leading-[11px]", item.tufted ? "text-[7px]" : "text-[8px]", fabric === item.id ? "font-semibold text-foreground" : "text-muted-foreground")}>{item.name}</span>
                   {fabric === item.id && <span className="absolute right-1 top-1 flex size-3 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-2" /></span>}
                 </Button>
               ))}
-            </div>
+              </div>
+            </div>)}
             <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">Weave scale</span><span className="font-mono text-muted-foreground">{textureScale}×</span></span><input aria-label="Weave scale" className="mt-2 w-full accent-primary" type="range" min="3" max="14" step="1" value={textureScale} onChange={(event) => setTextureScale(Number(event.target.value))} /></label>
           </section>
           <div className="my-4 h-px bg-border" />
@@ -1144,7 +1151,7 @@ export function SofaConfigurator() {
 }
 
 function Metric({ label, value, unit }: { label: string; value: number; unit: Unit }) {
-  return <div className="rounded-md bg-muted px-1.5 py-2"><div className="text-[9px] font-semibold uppercase text-muted-foreground">{label}</div><div className="mt-0.5 font-mono text-[11px] font-semibold">{formatDimension(value, unit)}</div></div>;
+  return <div className="rounded-sm border border-border/40 bg-muted/70 px-1.5 py-2.5"><div className="text-[9px] font-semibold uppercase text-muted-foreground">{label}</div><div className="mt-1 font-mono text-[11px] font-semibold tabular-nums">{formatDimension(value, unit)}</div></div>;
 }
 
 useGLTF.preload(sofaAsset.url);
