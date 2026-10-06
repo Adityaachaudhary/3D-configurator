@@ -36,3 +36,6 @@
 - [x] Add two leather finishes with padded diamond tufting and matching swatches.
 - [x] Make leather grain scale visibly adjustable without scaling tufting or changing dimensions.
 - [x] Verify all seating sizes and leather scale endpoints.
+## Chesterfield padded depth correction
+- [x] Form genuine recessed diamond seams and button pockets rather than shading alone.
+- [ ] Verify both Chesterfield finishes on all seating sizes, ordinary leather restoration, and unchanged measurements.

@@ -233,15 +233,39 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     if (tuft) {
       shader.uniforms["tuftMap"] = { value: tuft };
       shader.uniforms["tuftDensity"] = { value: 4.5 / scale };
+      shader.uniforms["tuftDepth"] = { value: 0.024 * scale };
     }
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
       shader.uniforms["patternDensity"] = { value: patternRepeat / scale };
     }
     shader.vertexShader = "varying vec3 surfacePosition; varying vec3 surfaceNormal;\n" + shader.vertexShader;
+    if (tuft) {
+      // Evaluate in joined world coordinates BEFORE projection: every module
+      // uses the same diamond grid, including the reflected chair halves.
+      shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>
+        uniform sampler2D tuftMap;
+        uniform float tuftDensity;
+        uniform float tuftDepth;
+        float paddedHeight(vec3 p, vec3 n) {
+          vec3 w = pow(abs(n), vec3(12.0));
+          w /= max(dot(w, vec3(1.0)), 0.0001);
+          return dot(vec3(texture2D(tuftMap, p.yz * tuftDensity).r, texture2D(tuftMap, p.xz * tuftDensity).r, texture2D(tuftMap, p.xy * tuftDensity).r), w);
+        }`);
+      shader.vertexShader = shader.vertexShader.replace("#include <project_vertex>", `
+        vec3 tuftOriginalPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vec3 tuftNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));
+        // Recess seams and buttons inside the original envelope; padded crowns
+        // retain the supplied sofa dimensions instead of inflating its bounds.
+        vec3 tuftOffset = -tuftNormal * tuftDepth * (1.0 - paddedHeight(tuftOriginalPosition, tuftNormal));
+        vec3 tuftX = modelMatrix[0].xyz, tuftY = modelMatrix[1].xyz, tuftZ = modelMatrix[2].xyz;
+        transformed += vec3(dot(tuftOffset, tuftX) / max(dot(tuftX, tuftX), 0.000001), dot(tuftOffset, tuftY) / max(dot(tuftY, tuftY), 0.000001), dot(tuftOffset, tuftZ) / max(dot(tuftZ, tuftZ), 0.000001));
+        #include <project_vertex>`);
+    }
     shader.vertexShader = shader.vertexShader.replace("#include <worldpos_vertex>", `#include <worldpos_vertex>
       surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
       surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));`);
+    if (tuft) shader.vertexShader = shader.vertexShader.replace("surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;", "surfacePosition = tuftOriginalPosition;");
     shader.fragmentShader = `varying vec3 surfacePosition;
       varying vec3 surfaceNormal;
       uniform float surfaceDensity;
@@ -291,7 +315,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v4-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
+  material.customProgramCacheKey = () => `physical-surface-v5-padded-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
