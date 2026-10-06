@@ -40,6 +40,6 @@
 - [x] Form genuine recessed diamond seams and button pockets rather than shading alone.
 - [x] Verify both Chesterfield finishes on all seating sizes, ordinary leather restoration, and unchanged measurements.
 ## Chesterfield realism refinement
-- [ ] Remove displacement cracks and sharp diamond ridges while retaining padded depth.
-- [ ] Refine recessed buttons, leather highlights, and swatch consistency.
-- [ ] Verify all sizes and both finishes, grain adjustment, and ordinary upholstery restoration.
+- [x] Reduce displacement cracks and sharp diamond ridges while retaining padded depth.
+- [x] Refine recessed buttons, leather highlights, and matching swatch profiles.
+- [x] Verify all sizes and both finishes, grain adjustment, and ordinary upholstery restoration.

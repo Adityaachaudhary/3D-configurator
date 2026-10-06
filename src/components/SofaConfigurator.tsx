@@ -315,7 +315,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         vec3 paddingR1 = cross(paddingDy, normal);
         vec3 paddingR2 = cross(normal, paddingDx);
         float paddingDet = dot(paddingDx, paddingR1);
-        float paddingHeight = tuftHeight(surfacePosition) * 0.014 * ${scale.toFixed(6)};
+        float paddingHeight = (tuftHeight(surfacePosition) * 0.014 + surfaceSample(bumpMap, surfacePosition).r * 0.00045) * ${scale.toFixed(6)};
         vec3 paddingGradient = sign(paddingDet) * (dFdx(paddingHeight) * paddingR1 + dFdy(paddingHeight) * paddingR2);
         normal = normalize(abs(paddingDet) * normal - paddingGradient);
       `);
