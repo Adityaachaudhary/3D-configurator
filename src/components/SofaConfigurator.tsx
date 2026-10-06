@@ -52,9 +52,10 @@ function useReducedMotion() {
 }
 
 const MODULE_WIDTH = 0.7;
-const seatingWidth = (seats: number) => BASE_SIZE.width + (seats - 2) * MODULE_WIDTH;
-
-const BASE_SIZE = { width: 1.901083, height: 0.800197, depth: 0.837505 };
+// The chart specifies exact inches; its millimeter equivalents are rounded.
+const INCH_METERS = 0.0254;
+const seatingWidth = (seats: number) => (34 + (seats - 1) * 24) * INCH_METERS;
+const BASE_SIZE = { width: seatingWidth(2), height: 32 * INCH_METERS, depth: 33 * INCH_METERS };
 const FABRICS: Array<{ id: FabricId; name: string; family: string; color: string; weave: string }> = [
   { id: "oat", name: "Oat Bouclé", family: "Bouclé 04", color: "#b8aa91", weave: "loop" },
   { id: "pearl", name: "Pearl Linen", family: "Linen 01", color: "#d7d2c7", weave: "linen" },
@@ -359,6 +360,11 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     return found;
   }, [scene]);
   const geometry = useMemo(() => (sourceMesh ? splitSofaGeometry(sourceMesh.geometry) : null), [sourceMesh]);
+  const sourceBounds = useMemo(() => {
+    if (!geometry) return null;
+    geometry.computeBoundingBox();
+    return geometry.boundingBox?.clone() ?? null;
+  }, [geometry]);
   const modules = useMemo(() => geometry ? [
     sliceModule(geometry, -Infinity, -MODULE_WIDTH),
     sliceModule(geometry, MODULE_WIDTH, Infinity),
@@ -388,18 +394,39 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     return half;
   }, [geometry]);
   const chairOtherHalf = useMemo(() => chairHalf ? reflectedGeometry(chairHalf) : null, [chairHalf]);
+  const chairBounds = useMemo(() => {
+    if (!chairHalf) return null;
+    chairHalf.computeBoundingBox();
+    return chairHalf.boundingBox?.clone() ?? null;
+  }, [chairHalf]);
   useEffect(() => () => { chairHalf?.dispose(); chairOtherHalf?.dispose(); }, [chairHalf, chairOtherHalf]);
   useEffect(() => () => { geometry?.dispose(); modules.forEach((module) => module.dispose()); }, [geometry, modules]);
   useFrame((_, rawDelta) => {
-    if (!assembly.current) return;
+    if (!assembly.current || !sourceBounds || !chairBounds) return;
     const n = reducedMotion ? seats : THREE.MathUtils.damp(animatedSeats.current, seats, 14, Math.min(rawDelta, 0.05));
     animatedSeats.current = Math.abs(n - seats) < 0.001 ? seats : n;
     const current = Math.max(2, animatedSeats.current);
     const chairBlend = THREE.MathUtils.clamp(2 - animatedSeats.current, 0, 1);
+    const sourceSize = sourceBounds.getSize(new THREE.Vector3());
+    const sourceCenter = sourceBounds.getCenter(new THREE.Vector3());
+    // Calibrate the complete joined assembly, not individual modules: shared
+    // transforms keep every cut closed while matching the physical size chart.
+    const sx = seatingWidth(current) / (sourceSize.x + (current - 2) * MODULE_WIDTH) * scale;
+    const sy = BASE_SIZE.height / sourceSize.y * scale;
+    const sz = BASE_SIZE.depth / sourceSize.z * scale;
+    assembly.current.scale.set(sx, sy, sz);
+    assembly.current.position.set(-sourceCenter.x * sx, 0.015 - sourceBounds.min.y * sy, -sourceCenter.z * sz);
     assembly.current.visible = chairBlend < 0.999;
     if (chair.current) {
       chair.current.visible = chairBlend > 0.001;
-      chair.current.scale.setScalar(scale * (0.95 + chairBlend * 0.05));
+      const reveal = 0.95 + chairBlend * 0.05;
+      const chairSize = chairBounds.getSize(new THREE.Vector3());
+      const chairCenter = chairBounds.getCenter(new THREE.Vector3());
+      const chairWidth = Math.max(Math.abs(chairBounds.min.x), Math.abs(chairBounds.max.x)) * 2;
+      const chairSy = BASE_SIZE.height / chairSize.y * scale * reveal;
+      const chairSz = BASE_SIZE.depth / chairSize.z * scale * reveal;
+      chair.current.scale.set(seatingWidth(1) / chairWidth * scale * reveal, chairSy, chairSz);
+      chair.current.position.set(0, 0.015 - chairBounds.min.y * chairSy, -chairCenter.z * chairSz);
     }
     for (const material of materials) {
       material.opacity = 1 - chairBlend;
@@ -472,14 +499,14 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   if (!geometry || !chairHalf || !chairOtherHalf || !leftCap || !rightCap || !leftSeat || !rightSeat || !insertLeft || !insertRight) return null;
   return (
     <>
-    <group ref={assembly} name="sofa-assembly" scale={scale} position={[0, 0.396396 * scale + 0.015, 0]} dispose={null}>
+    <group ref={assembly} name="sofa-assembly" dispose={null}>
       <mesh geometry={leftCap} material={materials} castShadow receiveShadow />
       <mesh geometry={rightCap} material={materials} castShadow receiveShadow />
       <mesh geometry={leftSeat} material={materials} castShadow receiveShadow />
       <group><mesh geometry={rightSeat} material={materials} position-x={-MODULE_WIDTH / 2} castShadow receiveShadow /></group>
       <group><mesh geometry={insertLeft} material={materials} castShadow receiveShadow /><mesh geometry={insertRight} material={materials} castShadow receiveShadow /></group>
     </group>
-    <group ref={chair} name="chair-assembly" scale={scale} position={[0, 0.396396 * scale + 0.015, 0]} dispose={null}>
+    <group ref={chair} name="chair-assembly" dispose={null}>
       <mesh geometry={chairHalf} material={chairMaterials} castShadow receiveShadow />
       <mesh geometry={chairOtherHalf} material={chairMaterials} castShadow receiveShadow />
     </group>
@@ -753,7 +780,7 @@ export function SofaConfigurator() {
           </section>
           <div className="my-4 h-px bg-border" />
           <section>
-            <div className="flex items-center justify-between"><div><h2 className="text-[13px] font-semibold">Scale & dimensions</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Estimated configuration size</p></div><CircleGauge className="size-4 text-muted-foreground" /></div>
+            <div className="flex items-center justify-between"><div><h2 className="text-[13px] font-semibold">Scale & dimensions</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Configuration size</p></div><CircleGauge className="size-4 text-muted-foreground" /></div>
             <div className="mt-2 flex rounded-md border border-border p-0.5">{(["cm", "mm", "in"] as Unit[]).map((item) => <Button key={item} variant={unit === item ? "selected" : "ghost"} size="sm" className="h-7 flex-1 px-1 text-[11px] uppercase" onClick={() => setUnit(item)}>{item}</Button>)}</div>
             <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">Model scale</span><span className="font-mono text-muted-foreground">{Math.round(scale * 100)}%</span></span><input className="mt-2 w-full accent-primary" type="range" min="0.8" max="1.2" step="0.01" value={scale} onChange={(event) => setScale(Number(event.target.value))} /></label>
             <div className="mt-3 grid grid-cols-3 gap-1.5 text-center"><Metric label="Width" value={seatingWidth(seats) * scale} unit={unit} /><Metric label="Height" value={BASE_SIZE.height * scale} unit={unit} /><Metric label="Depth" value={BASE_SIZE.depth * scale} unit={unit} /></div>

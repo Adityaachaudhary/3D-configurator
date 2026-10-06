@@ -18,3 +18,6 @@
 ## Pointer zoom
 - [x] Enable mouse-wheel and trackpad-pinch zoom toward the cursor with distance limits.
 - [x] Verify wheel zoom in and out in the viewer.
+## Supplied size chart
+- [x] Calibrate actual one-, two-, and three-seater geometry to the exact inch dimensions.
+- [x] Verify model bounds, rulers, and panel conversions at different scales.
