@@ -13,6 +13,7 @@ import {
   CircleGauge,
   Download,
   Expand,
+  Frame,
   Grid3X3,
   Maximize2,
   Minus,
@@ -345,7 +346,7 @@ function joinedModule(source: THREE.BufferGeometry) {
   return [reflectedGeometry(half), half];
 }
 
-function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion }: { fabric: FabricId; leg: LegId; textureScale: number; scale: number; seats: SeatCount; reducedMotion: boolean }) {
+function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wireframe }: { fabric: FabricId; leg: LegId; textureScale: number; scale: number; seats: SeatCount; reducedMotion: boolean; wireframe: boolean }) {
   const assembly = useRef<THREE.Group>(null);
   const chair = useRef<THREE.Group>(null);
   const animatedSeats = useRef<number>(2);
