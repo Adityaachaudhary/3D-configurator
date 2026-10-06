@@ -54,4 +54,4 @@
 - [x] Re-extend deep padding across seats, back cushions and sides while keeping edges clean.
 ## Subtle interface refinement and floor grid
 - [x] Restore the visible floor grid and verify its toggle.
-- [ ] Refine the interface subtly without changing its theme or working features.
+- [x] Refine the interface subtly without changing its theme or working features.
