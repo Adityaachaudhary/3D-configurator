@@ -15,3 +15,6 @@
 ## Wireframe inspection
 - [x] Add a left-toolbar wireframe toggle that works across all seating sizes.
 - [x] Verify wireframe on/off for one-, two-, and three-seater models.
+## Pointer zoom
+- [x] Enable mouse-wheel and trackpad-pinch zoom toward the cursor with distance limits.
+- [x] Verify wheel zoom in and out in the viewer.

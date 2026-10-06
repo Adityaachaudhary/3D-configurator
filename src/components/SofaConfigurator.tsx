@@ -612,7 +612,11 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
         makeDefault
         enableDamping
         dampingFactor={0.08}
-        enableZoom={false}
+        enableZoom
+        zoomSpeed={0.9}
+        zoomToCursor
+        minDistance={1.7}
+        maxDistance={7}
         minPolarAngle={0.35}
         maxPolarAngle={Math.PI / 2.02}
         autoRotate={rotate}
@@ -756,7 +760,7 @@ export function SofaConfigurator() {
           </section>
         </div>
       </aside>
-      <div className="pointer-events-none absolute bottom-20 left-3 hidden items-center gap-2 rounded-md bg-surface/85 px-3 py-2 text-[10px] font-medium text-muted-foreground shadow-sm lg:flex"><Maximize2 className="size-3" /> Drag to orbit · right-drag to pan</div>
+      <div className="pointer-events-none absolute bottom-20 left-3 hidden items-center gap-2 rounded-md bg-surface/85 px-3 py-2 text-[10px] font-medium text-muted-foreground shadow-sm lg:flex"><Maximize2 className="size-3" /> Drag to orbit · scroll or pinch to zoom · right-drag to pan</div>
     </main>
   );
 }
