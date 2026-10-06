@@ -62,9 +62,9 @@
   --color-surface: var(--surface);
   --color-dimension: var(--dimension);
   --color-dimension-foreground: var(--dimension-foreground);
-  --font-sans: "DM Sans", sans-serif;
-  --font-display: "Manrope", sans-serif;
-  --shadow-panel: 0 16px 42px color-mix(in oklab, var(--foreground) 14%, transparent);
+  --font-sans: "Manrope", sans-serif;
+  --font-display: "Sora", sans-serif;
+  --shadow-panel: 0 8px 24px color-mix(in oklab, var(--foreground) 7%, transparent);
 }
 
 :root {
@@ -104,25 +104,25 @@
   --leg-walnut: oklch(0.349 0.046 45);
   --leg-ebonized: oklch(0.246 0.004 128);
   --leg-steel: oklch(0.632 0.006 123);
-  --background: oklch(0.93 0.008 90);
+  --background: oklch(0.941 0.004 145);
   --foreground: oklch(0.23 0.018 145);
-  --surface: oklch(0.985 0.004 90);
+  --surface: oklch(1 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.29 0.04 145);
+  --primary: oklch(0.342 0.038 148);
   --primary-foreground: oklch(0.985 0.004 90);
   --secondary: oklch(0.84 0.025 75);
   --secondary-foreground: oklch(0.23 0.018 145);
-  --muted: oklch(0.945 0.006 90);
+  --muted: oklch(0.941 0.004 145);
   --muted-foreground: oklch(0.48 0.018 145);
   --accent: oklch(0.91 0.018 95);
   --accent-foreground: oklch(0.23 0.018 145);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.84 0.01 90);
-  --input: oklch(0.84 0.01 90);
+  --border: oklch(0.805 0.013 145);
+  --input: oklch(0.805 0.013 145);
   --ring: oklch(0.43 0.05 145);
   --dimension: oklch(0.27 0.025 145);
   --dimension-foreground: oklch(0.98 0.004 90);
@@ -202,3 +202,27 @@
 .leg-swatch[data-leg="walnut"] { background: var(--leg-walnut); }
 .leg-swatch[data-leg="ebonized"] { background: var(--leg-ebonized); }
 .leg-swatch[data-leg="steel"] { background: var(--leg-steel); }
+
+.configuration-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.configuration-scroll h2 {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.configuration-scroll input[type="range"] {
+  display: block;
+  height: 18px;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-configurator-root] *, [data-configurator-root] *::before, [data-configurator-root] *::after {
+    transition-duration: 0s;
+  }
+}
