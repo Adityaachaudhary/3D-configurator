@@ -233,7 +233,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     if (tuft) {
       shader.uniforms["tuftMap"] = { value: tuft };
       shader.uniforms["tuftDensity"] = { value: 4.5 / scale };
-      shader.uniforms["tuftDepth"] = { value: 0.024 * scale };
+      shader.uniforms["tuftDepth"] = { value: 0.018 * scale };
     }
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
@@ -641,7 +641,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const upholstery = new THREE.MeshPhysicalMaterial({
       color: fabricColor,
       ...fabricTexture,
-      bumpScale: selectedFabric.tufted ? 0.045 : leather ? 0.00045 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
+      bumpScale: selectedFabric.tufted ? 0.020 : leather ? 0.00045 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
       roughness: leather ? 0.48 : selectedFabric.weave === "velvet" ? 0.78 : 0.91,
       metalness: 0,
       sheen: leather ? 0 : selectedFabric.weave === "velvet" ? 0.7 : selectedFabric.weave === "loop" ? 0.3 : 0.18,
