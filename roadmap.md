@@ -12,3 +12,6 @@
 - [x] Refine fabric relief, sheen, and leg surface finishes.
 - [x] Improve one- and three-seater geometry without duplication artifacts.
 - [x] Verify all seating sizes, finishes, joins, and measurements in the viewer.
+## Wireframe inspection
+- [x] Add a left-toolbar wireframe toggle that works across all seating sizes.
+- [x] Verify wireframe on/off for one-, two-, and three-seater models.
