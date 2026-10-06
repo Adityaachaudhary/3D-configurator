@@ -29,6 +29,6 @@
 - [x] Prevent canvas preview shrinkage and label every compact fabric swatch.
 - [x] Verify all twelve fabrics on all seaters and compare scale endpoints visually.
 ## Subtle texture and leather
-- [ ] Limit oversized weave detail without removing visible scale adjustment.
-- [ ] Add leather finishes and matching swatches on all seating sizes.
-- [ ] Verify finish changes and texture-scale endpoints in the viewer.
+- [x] Limit oversized weave detail without removing visible scale adjustment.
+- [x] Add leather finishes and matching swatches on all seating sizes.
+- [x] Verify finish changes and texture-scale endpoints in the viewer.
