@@ -33,7 +33,9 @@ import sofaAsset from "@/assets/Panache-OPAA.glb.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type FabricId = "oat" | "sage" | "clay" | "ink" | "pearl" | "moss";
+type FabricId = "oat" | "sage" | "clay" | "ink" | "pearl" | "moss" | "ocean-stripe" | "olive-check" | "rose-check" | "ochre-chevron" | "teal-diamond" | "graphite-stripe";
+type PatternKind = "stripe" | "check" | "chevron" | "diamond";
+type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind };
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
 type Unit = "cm" | "mm" | "in";
 type ViewName = "perspective" | "front" | "side" | "rear";
@@ -56,13 +58,19 @@ const MODULE_WIDTH = 0.7;
 const INCH_METERS = 0.0254;
 const seatingWidth = (seats: number) => (34 + (seats - 1) * 24) * INCH_METERS;
 const BASE_SIZE = { width: seatingWidth(2), height: 32 * INCH_METERS, depth: 33 * INCH_METERS };
-const FABRICS: Array<{ id: FabricId; name: string; family: string; color: string; weave: string }> = [
+const FABRICS: FabricPreset[] = [
   { id: "oat", name: "Oat Bouclé", family: "Bouclé 04", color: "#b8aa91", weave: "loop" },
   { id: "pearl", name: "Pearl Linen", family: "Linen 01", color: "#d7d2c7", weave: "linen" },
   { id: "sage", name: "Sage Weave", family: "Weave 12", color: "#788477", weave: "linen" },
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
   { id: "ink", name: "Ink Velvet", family: "Velvet 02", color: "#34383b", weave: "velvet" },
+  { id: "ocean-stripe", name: "Ocean Stripe", family: "Stripe · Linen", color: "#ffffff", weave: "linen", pattern: "stripe" },
+  { id: "olive-check", name: "Olive Check", family: "Check · Woven", color: "#ffffff", weave: "linen", pattern: "check" },
+  { id: "rose-check", name: "Rose Check", family: "Check · Woven", color: "#ffffff", weave: "linen", pattern: "check" },
+  { id: "ochre-chevron", name: "Ochre Chevron", family: "Chevron · Twill", color: "#ffffff", weave: "twill", pattern: "chevron" },
+  { id: "teal-diamond", name: "Teal Diamond", family: "Diamond · Jacquard", color: "#ffffff", weave: "twill", pattern: "diamond" },
+  { id: "graphite-stripe", name: "Graphite Stripe", family: "Stripe · Linen", color: "#ffffff", weave: "linen", pattern: "stripe" },
 ];
 const LEGS: Array<{ id: LegId; name: string; color: string; metalness: number; roughness: number }> = [
   { id: "oak", name: "Natural oak", color: "#9b7147", metalness: 0, roughness: 0.54 },
@@ -132,13 +140,67 @@ function createSurfaceMaps(kind: string) {
   return { map: make(colour, true), bumpMap: make(relief), roughnessMap: make(rough) };
 }
 
-function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number) {
+// The preview and upholstery share exactly the same seamless repeat artwork.
+function createPatternCanvas(fabric: FabricPreset) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx || !fabric.pattern) return canvas;
+  const css = getComputedStyle(document.documentElement);
+  const palette = ["base", "accent", "detail"].map((role) => {
+    ctx.fillStyle = css.getPropertyValue(`--pattern-${fabric.id}-${role}`).trim();
+    ctx.fillRect(0, 0, 1, 1);
+    return Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3);
+  });
+  const image = ctx.createImageData(256, 256);
+  for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+    const u = x / 256, v = y / 256;
+    let color = 0;
+    if (fabric.pattern === "stripe") color = u < 0.42 ? 0 : u < 0.78 ? 1 : u < 0.84 ? 2 : 0;
+    if (fabric.pattern === "check") {
+      const a = u < 0.5, b = v < 0.5;
+      color = a && b ? 1 : a || b ? 2 : 0;
+    }
+    if (fabric.pattern === "chevron") {
+      const zig = Math.abs(u * 2 - 1);
+      const band = (v + zig * 0.5) % 1;
+      color = band < 0.42 ? 0 : band < 0.82 ? 1 : 2;
+    }
+    if (fabric.pattern === "diamond") {
+      const d = Math.abs(u - 0.5) + Math.abs(v - 0.5);
+      color = d < 0.26 ? 1 : d < 0.31 || d > 0.69 && d < 0.74 ? 2 : 0;
+    }
+    const rgb = palette[color] ?? palette[0] ?? [];
+    const thread = 0.97 + 0.03 * Math.sin(x * Math.PI / 2) * Math.sin(y * Math.PI / 2);
+    const i = (y * 256 + x) * 4;
+    for (let k = 0; k < 3; k++) image.data[i + k] = (rgb[k] ?? 0) * thread;
+    image.data[i + 3] = 255;
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+function FabricSwatch({ fabric }: { fabric: FabricPreset }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (!fabric.pattern || !canvas.current) return;
+    const ctx = canvas.current.getContext("2d");
+    ctx?.drawImage(createPatternCanvas(fabric), 0, 0, 64, 64);
+  }, [fabric]);
+  return fabric.pattern ? <canvas ref={canvas} width={64} height={64} aria-hidden="true" className="block h-full w-full rounded-[3px]" /> : <span data-fabric={fabric.id} className="fabric-swatch block h-full w-full rounded-[3px]" />;
+}
+
+function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms["surfaceDensity"] = { value: density / scale };
+    if (pattern) {
+      shader.uniforms["patternMap"] = { value: pattern };
+      shader.uniforms["patternDensity"] = { value: 8 / scale };
+    }
     shader.vertexShader = "varying vec3 surfacePosition; varying vec3 surfaceNormal;\n" + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace("#include <worldpos_vertex>", `#include <worldpos_vertex>
       surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
-      surfaceNormal = normalize(mat3(modelMatrix) * normal);`);
+      surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));`);
     shader.fragmentShader = `varying vec3 surfacePosition;
       varying vec3 surfaceNormal;
       uniform float surfaceDensity;
@@ -149,6 +211,18 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
           + texture2D(tex, p.xz * surfaceDensity) * weights.y
           + texture2D(tex, p.xy * surfaceDensity) * weights.z;
       }\n` + shader.fragmentShader;
+    if (pattern) {
+      shader.fragmentShader = `uniform sampler2D patternMap;
+        uniform float patternDensity;
+        vec3 patternLinear(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n` + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>
+        vec3 patternWeights = pow(abs(normalize(surfaceNormal)), vec3(12.0));
+        patternWeights /= max(dot(patternWeights, vec3(1.0)), 0.0001);
+        vec3 patternP = (surfacePosition - vec3(0.0, 0.015, 0.0)) * patternDensity;
+        diffuseColor.rgb *= patternLinear(texture2D(patternMap, patternP.zy).rgb) * patternWeights.x
+          + patternLinear(texture2D(patternMap, patternP.xz).rgb) * patternWeights.y
+          + patternLinear(texture2D(patternMap, patternP.xy).rgb) * patternWeights.z;`);
+    }
     // Three leaves these chunks unexpanded at onBeforeCompile time.
     // Expand only the sampling chunks before replacing their UV lookups.
     shader.fragmentShader = shader.fragmentShader
@@ -163,7 +237,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", "surfaceSample(bumpMap, surfacePosition + dSTdx).x")
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", "surfaceSample(bumpMap, surfacePosition + dSTdy).x");
   };
-  material.customProgramCacheKey = () => `physical-surface-v1-${density}-${scale}`;
+  material.customProgramCacheKey = () => `physical-surface-v2-${density}-${scale}-${pattern?.uuid ?? "plain"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
@@ -456,6 +530,16 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   });
   const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
   const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
+  const patternTexture = useMemo(() => {
+    if (!selectedFabric.pattern) return null;
+    const texture = new THREE.CanvasTexture(createPatternCanvas(selectedFabric));
+    // Custom sampler performs explicit sRGB decoding, unlike the built-in map.
+    texture.colorSpace = THREE.NoColorSpace;
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.anisotropy = 8;
+    return texture;
+  }, [selectedFabric]);
+  useEffect(() => () => patternTexture?.dispose(), [patternTexture]);
   const fabricTexture = useMemo(
     () => createSurfaceMaps(selectedFabric.weave),
     [selectedFabric.weave],
@@ -481,15 +565,15 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       roughness: selectedLeg.roughness,
       metalness: selectedLeg.metalness,
     });
-    projectSurface(upholstery, textureScale * 0.8, scale);
+    projectSurface(upholstery, textureScale * 0.8, scale, patternTexture);
     projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
-  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg]);
+  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture]);
   const chairMaterials = useMemo(() => materials.map((material, i) => {
     const clone = material.clone();
-    projectSurface(clone, i === 0 ? textureScale * 0.8 : leg === "steel" ? 3 : 1.6, scale);
+    projectSurface(clone, i === 0 ? textureScale * 0.8 : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null);
     return clone;
-  }), [materials, textureScale, leg, scale]);
+  }), [materials, textureScale, leg, scale, patternTexture]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
   useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
   useEffect(() => {
@@ -760,7 +844,7 @@ export function SofaConfigurator() {
             <div className="mt-2 grid grid-cols-6 gap-1.5">
               {FABRICS.map((item) => (
                 <Button variant="ghost" key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-9 rounded-md border bg-muted p-1 text-left", fabric === item.id ? "border-primary ring-1 ring-primary" : "border-border")}>
-                  <span data-fabric={item.id} className="fabric-swatch block h-full w-full rounded-[3px]" />
+                   <FabricSwatch fabric={item} />
                   {fabric === item.id && <span className="absolute right-1 top-1 flex size-3 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-2" /></span>}
                 </Button>
               ))}

@@ -70,6 +70,24 @@
 :root {
   --radius: 0.375rem;
   --panel-width: 20rem;
+  --pattern-ocean-stripe-base: oklch(0.92 0.018 90);
+  --pattern-ocean-stripe-accent: oklch(0.48 0.075 238);
+  --pattern-ocean-stripe-detail: oklch(0.7 0.075 180);
+  --pattern-olive-check-base: oklch(0.9 0.03 96);
+  --pattern-olive-check-accent: oklch(0.43 0.055 135);
+  --pattern-olive-check-detail: oklch(0.67 0.045 135);
+  --pattern-rose-check-base: oklch(0.93 0.014 70);
+  --pattern-rose-check-accent: oklch(0.5 0.105 10);
+  --pattern-rose-check-detail: oklch(0.74 0.05 10);
+  --pattern-ochre-chevron-base: oklch(0.91 0.02 92);
+  --pattern-ochre-chevron-accent: oklch(0.66 0.11 85);
+  --pattern-ochre-chevron-detail: oklch(0.4 0.018 90);
+  --pattern-teal-diamond-base: oklch(0.91 0.018 100);
+  --pattern-teal-diamond-accent: oklch(0.48 0.07 185);
+  --pattern-teal-diamond-detail: oklch(0.7 0.08 85);
+  --pattern-graphite-stripe-base: oklch(0.88 0.004 240);
+  --pattern-graphite-stripe-accent: oklch(0.33 0.012 240);
+  --pattern-graphite-stripe-detail: oklch(0.62 0.02 230);
   --fabric-oat: oklch(0.742 0.038 83);
   --fabric-pearl: oklch(0.862 0.016 88);
   --fabric-sage: oklch(0.599 0.023 141);

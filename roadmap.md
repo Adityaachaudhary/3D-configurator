@@ -21,3 +21,6 @@
 ## Supplied size chart
 - [x] Calibrate actual one-, two-, and three-seater geometry to the exact inch dimensions.
 - [x] Verify model bounds, rulers, and panel conversions at different scales.
+## Patterned upholstery
+- [x] Add multicolour patterns with matching compact swatch previews and physical-coordinate mapping.
+- [x] Verify patterns on all seating sizes, scale changes, and retained leg finishes.
