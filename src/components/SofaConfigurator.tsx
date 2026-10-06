@@ -649,7 +649,7 @@ export function SofaConfigurator() {
   const [zoomSignal, setZoomSignal] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
   const reset = useCallback(() => {
-    setSeats(2); setFabric("oat"); setLeg("oak"); setTextureScale(7); setScale(1); setGrid(true); setMeasures(true); setRotate(false); setStudio(true); setUnit("cm"); setView("perspective");
+    setSeats(2); setFabric("oat"); setLeg("oak"); setTextureScale(7); setScale(1); setGrid(true); setMeasures(true); setRotate(false); setStudio(true); setWireframe(false); setUnit("cm"); setView("perspective");
   }, []);
   const screenshot = () => {
     const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-viewer-canvas='true']");
@@ -670,7 +670,7 @@ export function SofaConfigurator() {
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
-      <div className="absolute inset-0 sm:right-[var(--panel-width)]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} />{measures && (["width", "height", "depth"] as const).map((axis) => <span key={axis} data-dimension={axis} className="pointer-events-none absolute left-0 top-0 z-10 whitespace-nowrap rounded-sm bg-dimension px-1.5 py-0.5 font-mono text-[11px] text-dimension-foreground" />)}</div>
+      <div className="absolute inset-0 sm:right-[var(--panel-width)]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} wireframe={wireframe} />{measures && (["width", "height", "depth"] as const).map((axis) => <span key={axis} data-dimension={axis} className="pointer-events-none absolute left-0 top-0 z-10 whitespace-nowrap rounded-sm bg-dimension px-1.5 py-0.5 font-mono text-[11px] text-dimension-foreground" />)}</div>
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between border-b border-border/80 bg-surface/95 px-4 sm:px-6">
         <div className="pointer-events-auto flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground"><Box className="size-4" /></div>
@@ -693,6 +693,7 @@ export function SofaConfigurator() {
         <ToolButton label="Toggle measurements" active={measures} onClick={() => setMeasures((value) => !value)}><Ruler className="size-4" /></ToolButton>
         <ToolButton label="Toggle auto rotate" active={rotate} onClick={() => setRotate((value) => !value)}><Rotate3D className="size-4" /></ToolButton>
         <ToolButton label="Change studio" active={!studio} onClick={() => setStudio((value) => !value)}><SunMedium className="size-4" /></ToolButton>
+        <ToolButton label="Toggle wireframe" active={wireframe} onClick={() => setWireframe((value) => !value)}><Frame className="size-4" /></ToolButton>
       </nav>
 
       <section className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 sm:left-[calc((100%_-_var(--panel-width))/_2)] rounded-md border border-border bg-surface/95 p-1 shadow-panel sm:bottom-5">
