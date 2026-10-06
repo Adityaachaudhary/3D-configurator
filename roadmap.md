@@ -32,3 +32,7 @@
 - [x] Limit oversized weave detail without removing visible scale adjustment.
 - [x] Add leather finishes and matching swatches on all seating sizes.
 - [x] Verify finish changes and texture-scale endpoints in the viewer.
+## Chesterfield leather
+- [x] Add two leather finishes with padded diamond tufting and matching swatches.
+- [x] Make leather grain scale visibly adjustable without scaling tufting or changing dimensions.
+- [x] Verify all seating sizes and leather scale endpoints.
