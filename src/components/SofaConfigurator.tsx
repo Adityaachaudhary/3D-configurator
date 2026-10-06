@@ -134,7 +134,9 @@ function createSurfaceMaps(kind: string) {
       }
       const i = (y * size + x) * 4;
       const contrast = kind === "wood" ? 0.3 : kind === "leather" ? 0.12 : kind === "velvet" ? 0.045 : 0.10;
-      const value = Math.round(255 * (kind === "tuft" ? 0.72 + height * 0.28 : 0.94 + (height - 0.5) * contrast));
+      // Clamp: Uint8Array wraps out-of-range values, which turned wood grain crests black.
+      const value = Math.round(255 * THREE.MathUtils.clamp(kind === "tuft" ? 0.72 + height * 0.28 : 0.94 + (height - 0.5) * contrast, 0, 1));
+      height = THREE.MathUtils.clamp(height, 0, 1);
       for (let k = 0; k < 3; k += 1) {
         colour[i + k] = value;
         relief[i + k] = Math.round(height * 255);
@@ -231,13 +233,21 @@ const leatherDensity = (value: number) => 11 - (value - 3) * 8 / 11;
 
 // Smooth periodic profile mirrors createSurfaceMaps("tuft") without mip-level
 // flattening; it is sampled at physical coordinates for both depth and shading.
+// `detail` removes sub-vertex/sub-pixel button heads that otherwise alias into
+// jagged spikes; `tuftPanelMask` keeps rolled edges, corners and the base welt
+// smooth (as real Chesterfields are) where triplanar projections would switch.
 const tuftProfileGLSL = `
-  float tuftProfile(vec2 uv) {
+  float tuftProfile(vec2 uv, float detail) {
     vec2 cell = fract(vec2(uv.x + uv.y, uv.x - uv.y));
     vec2 edge = min(cell, 1.0 - cell);
     float r = dot(edge, edge);
-    float crown = pow(max(0.0, sin(cell.x * 3.14159265) * sin(cell.y * 3.14159265)), 1.6);
-    return max(0.0, 0.40 + 0.60 * crown - 0.30 * exp(-r / 0.0042) + 0.12 * exp(-r / 0.0003));
+    float crown = pow(max(0.0, sin(cell.x * 3.14159265) * sin(cell.y * 3.14159265)), 1.3);
+    float pleat = 1.0 - exp(-min(edge.x, edge.y) / 0.035);
+    return clamp(0.30 + 0.62 * crown + 0.08 * pleat - 0.34 * exp(-r / 0.0055) + 0.16 * detail * exp(-r / 0.00035), 0.0, 1.0);
+  }
+  float tuftPanelMask(vec3 n) {
+    vec3 a = abs(n);
+    return smoothstep(0.74, 0.86, max(a.x, max(a.y, a.z)));
   }
 `;
 
@@ -247,7 +257,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     if (tuft) {
       shader.uniforms["tuftMap"] = { value: tuft };
       shader.uniforms["tuftDensity"] = { value: 4.5 / scale };
-      shader.uniforms["tuftDepth"] = { value: 0.005 * scale };
+      shader.uniforms["tuftDepth"] = { value: 0.009 * scale };
     }
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
@@ -259,21 +269,27 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       // uses the same diamond grid, including the reflected chair halves.
       shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>
         attribute vec3 tuftDirection;
+        attribute vec4 tuftFrame;
         uniform sampler2D tuftMap;
         uniform float tuftDensity;
         uniform float tuftDepth;
+        varying float vTuftMask;
         ${tuftProfileGLSL}
         float paddedHeight(vec3 p, vec3 n) {
           vec3 w = pow(abs(n), vec3(12.0));
           w /= max(dot(w, vec3(1.0)), 0.0001);
-          return dot(vec3(tuftProfile(p.yz * tuftDensity), tuftProfile(p.xz * tuftDensity), tuftProfile(p.xy * tuftDensity)), w);
+          return dot(vec3(tuftProfile(p.yz * tuftDensity, 0.0), tuftProfile(p.xz * tuftDensity, 0.0), tuftProfile(p.xy * tuftDensity, 0.0)), w);
         }`);
       shader.vertexShader = shader.vertexShader.replace("#include <project_vertex>", `
         vec3 tuftOriginalPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
         vec3 tuftNormal = normalize(vec3(dot(tuftDirection, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(tuftDirection, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(tuftDirection, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));
+        vec3 tuftPanel = normalize(vec3(dot(tuftFrame.xyz, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(tuftFrame.xyz, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(tuftFrame.xyz, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));
+        // Panels only: rolled edges, wrinkled borders and the welt above the
+        // legs stay smooth so the surface never tears where projections meet.
+        vTuftMask = tuftFrame.w * tuftPanelMask(tuftPanel);
         // Recess seams and buttons inside the original envelope; padded crowns
         // retain the supplied sofa dimensions instead of inflating its bounds.
-        vec3 tuftOffset = -tuftNormal * tuftDepth * (1.0 - paddedHeight(tuftOriginalPosition, tuftNormal));
+        vec3 tuftOffset = -tuftNormal * tuftDepth * vTuftMask * (1.0 - paddedHeight(tuftOriginalPosition, tuftPanel));
         vec3 tuftX = modelMatrix[0].xyz, tuftY = modelMatrix[1].xyz, tuftZ = modelMatrix[2].xyz;
         transformed += vec3(dot(tuftOffset, tuftX) / max(dot(tuftX, tuftX), 0.000001), dot(tuftOffset, tuftY) / max(dot(tuftY, tuftY), 0.000001), dot(tuftOffset, tuftZ) / max(dot(tuftZ, tuftZ), 0.000001));
         #include <project_vertex>`);
@@ -283,7 +299,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));`);
     if (tuft) shader.vertexShader = shader.vertexShader
       .replace("surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;", "surfacePosition = tuftOriginalPosition;")
-      .replace("surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));", "surfaceNormal = tuftNormal;");
+      .replace("surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));", "surfaceNormal = tuftPanel;");
     shader.fragmentShader = `varying vec3 surfacePosition;
       varying vec3 surfaceNormal;
       uniform float surfaceDensity;
@@ -298,15 +314,22 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
         uniform sampler2D tuftMap;
         uniform float tuftDensity;
+        varying float vTuftMask;
         ${tuftProfileGLSL}
         float tuftHeight(vec3 p) {
           vec3 w = pow(abs(normalize(surfaceNormal)), vec3(12.0));
           w /= max(dot(w, vec3(1.0)), 0.0001);
-          return dot(vec3(tuftProfile(p.yz * tuftDensity), tuftProfile(p.xz * tuftDensity), tuftProfile(p.xy * tuftDensity)), w);
+          // Fade button heads once they shrink below a pixel to avoid sparkle.
+          float detail = 1.0 - smoothstep(0.012, 0.04, length(fwidth(surfacePosition)) * tuftDensity);
+          float h = dot(vec3(tuftProfile(p.yz * tuftDensity, detail), tuftProfile(p.xz * tuftDensity, detail), tuftProfile(p.xy * tuftDensity, detail)), w);
+          return mix(1.0, h, clamp(vTuftMask, 0.0, 1.0));
         }
         vec4 surfaceRelief(sampler2D tex, vec3 p) { return vec4(tuftHeight(p) + surfaceSample(tex, p).r * 0.075); }
         \n`);
-      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.86 + 0.14 * tuftHeight(surfacePosition);');
+      // Seams and button pockets read as softly occluded folds.
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nfloat tuftShade = tuftHeight(surfacePosition);\ndiffuseColor.rgb *= 0.74 + 0.26 * smoothstep(0.0, 0.85, tuftShade);');
+      // Stretched crowns are slightly glossier than the creased seams.
+      shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor * mix(1.22, 0.88, tuftShade), 0.04, 1.0);');
       // Use physical surface derivatives: Three's normalized bump derivatives
       // otherwise flatten large padded forms at normal viewing distances.
       shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `
@@ -315,7 +338,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         vec3 paddingR1 = cross(paddingDy, normal);
         vec3 paddingR2 = cross(normal, paddingDx);
         float paddingDet = dot(paddingDx, paddingR1);
-        float paddingHeight = (tuftHeight(surfacePosition) * 0.022 + surfaceSample(bumpMap, surfacePosition).r * 0.00045) * ${scale.toFixed(6)};
+        float paddingHeight = (tuftShade * 0.032 + surfaceSample(bumpMap, surfacePosition).r * 0.00045) * ${scale.toFixed(6)};
         vec3 paddingGradient = sign(paddingDet) * (dFdx(paddingHeight) * paddingR1 + dFdy(paddingHeight) * paddingR2);
         normal = normalize(abs(paddingDet) * normal - paddingGradient);
       `);
@@ -346,7 +369,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v11-fuller-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
+  material.customProgramCacheKey = () => `physical-surface-v14-panel-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
@@ -406,6 +429,16 @@ function splitSofaGeometry(source: THREE.BufferGeometry) {
     componentMinZ[root] = Math.min(componentMinZ[root] ?? Infinity, position.getZ(index));
     componentMaxZ[root] = Math.max(componentMaxZ[root] ?? -Infinity, position.getZ(index));
   }
+  // Locate each tapered foot from its tip, then claim the full cone up to the
+  // base underside so no upholstery colour bleeds onto the top of the legs.
+  const legAxes = [[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx, sz]) => {
+    let x = 0, z = 0, count = 0;
+    for (let index = 0; index < position.count; index += 1) {
+      const px = position.getX(index), pz = position.getZ(index);
+      if (position.getY(index) < -0.37 && px * (sx ?? 1) > 0.7 && pz * (sz ?? 1) > 0.2) { x += px; z += pz; count += 1; }
+    }
+    return count ? [x / count, z / count] as const : null;
+  }).filter((axis): axis is readonly [number, number] => axis !== null);
   const fabric: number[] = [];
   const legs: number[] = [];
   for (let triangle = 0; triangle < triangleCount; triangle += 1) {
@@ -415,7 +448,7 @@ function splitSofaGeometry(source: THREE.BufferGeometry) {
     const centerX = indices.reduce((sum, index) => sum + position.getX(index), 0) / 3;
     const centerY = indices.reduce((sum, index) => sum + position.getY(index), 0) / 3;
     const centerZ = indices.reduce((sum, index) => sum + position.getZ(index), 0) / 3;
-    const isLeg = centerY < -0.335 && Math.abs(centerX) > 0.76 && Math.abs(centerZ) > 0.2;
+    const isLeg = centerY < -0.3085 && legAxes.some(([x, z]) => Math.hypot(centerX - x, centerZ - z) < 0.0335);
     (isLeg ? legs : fabric).push(...indices);
   }
   geometry.setIndex([...fabric, ...legs]);
@@ -442,7 +475,71 @@ function splitSofaGeometry(source: THREE.BufferGeometry) {
     if (direction) direction.toArray(tuftDirections, i * 3);
   }
   geometry.setAttribute("tuftDirection", new THREE.BufferAttribute(tuftDirections, 3));
+  geometry.setAttribute("tuftFrame", new THREE.BufferAttribute(tuftPanelFrame(position, geometry.index, fabric.length, keyAt, directions), 4));
   return geometry;
+}
+
+// Tufting belongs on broad panels. A neighbourhood-smoothed normal picks one
+// stable projection per panel (xyz), and w fades the tufting out across rolled
+// edges, wrinkled cushion borders and the base welt, where per-vertex normals
+// flip between projections and would tear the padded relief.
+function tuftPanelFrame(position: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, index: THREE.BufferAttribute | null, fabricCount: number, keyAt: (i: number) => string, directions: Map<string, THREE.Vector3>) {
+  const ids = new Map<string, number>();
+  const vertexId = new Int32Array(position.count);
+  const raw: THREE.Vector3[] = [];
+  const heights: number[] = [];
+  for (let i = 0; i < position.count; i += 1) {
+    const key = keyAt(i);
+    let id = ids.get(key);
+    if (id === undefined) {
+      id = raw.length;
+      ids.set(key, id);
+      raw.push(directions.get(key)?.clone() ?? new THREE.Vector3(0, 1, 0));
+      heights.push(position.getY(i));
+    }
+    vertexId[i] = id;
+  }
+  const count = raw.length;
+  const neighbours: Set<number>[] = Array.from({ length: count }, () => new Set<number>());
+  const onFabric = new Uint8Array(count);
+  for (let i = 0; i < fabricCount; i += 3) {
+    const tri = [0, 1, 2].map((k) => vertexId[index ? index.getX(i + k) : i + k] ?? 0);
+    for (const a of tri) {
+      onFabric[a] = 1;
+      for (const b of tri) if (a !== b) neighbours[a]?.add(b);
+    }
+  }
+  const lists = neighbours.map((set) => Array.from(set));
+  let smooth = raw.map((v) => v.clone());
+  for (let pass = 0; pass < 28; pass += 1) {
+    smooth = smooth.map((v, i) => {
+      const next = v.clone();
+      for (const j of lists[i] ?? []) next.add(smooth[j] ?? v);
+      return next.normalize();
+    });
+  }
+  let mask = smooth.map((v, i) => {
+    const a = Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z));
+    const panel = THREE.MathUtils.smoothstep(a, 0.82, 0.94);
+    const wrinkle = 1 - THREE.MathUtils.smoothstep(1 - (raw[i]?.dot(v) ?? 1), 0.035, 0.12);
+    const welt = THREE.MathUtils.smoothstep(heights[i] ?? 0, -0.305, -0.265);
+    return onFabric[i] ? panel * wrinkle * welt : 0;
+  });
+  for (let pass = 0; pass < 6; pass += 1) {
+    mask = mask.map((value, i) => {
+      const list = lists[i] ?? [];
+      let sum = value;
+      for (const j of list) sum += mask[j] ?? value;
+      return Math.min(value, sum / (list.length + 1)) * 0.5 + (sum / (list.length + 1)) * 0.5;
+    });
+  }
+  const frame = new Float32Array(position.count * 4);
+  for (let i = 0; i < position.count; i += 1) {
+    const id = vertexId[i] ?? 0;
+    const v = smooth[id] ?? raw[id] ?? new THREE.Vector3(0, 1, 0);
+    frame.set([v.x, v.y, v.z, mask[id] ?? 0], i * 4);
+  }
+  return frame;
 }
 
 // Clip crossing triangles exactly at module boundaries, retaining UVs and normals.
@@ -514,10 +611,12 @@ function reflectedGeometry(source: THREE.BufferGeometry) {
   const p = result.getAttribute("position");
   const n = result.getAttribute("normal");
   const direction = result.getAttribute("tuftDirection");
+  const frame = result.getAttribute("tuftFrame");
   for (let i = 0; i < p.count; i += 1) {
     p.setX(i, -p.getX(i));
     n.setX(i, -n.getX(i));
     if (direction) direction.setX(i, -direction.getX(i));
+    if (frame) frame.setX(i, -frame.getX(i));
   }
   for (const attribute of Object.values(result.attributes)) {
     for (let i = 0; i < attribute.count; i += 3) {
@@ -536,9 +635,14 @@ function softenMirrorPlane(geometry: THREE.BufferGeometry, plane: number) {
   const positions = geometry.getAttribute("position");
   const normals = geometry.getAttribute("normal");
   const directions = geometry.getAttribute("tuftDirection");
+  const frames = geometry.getAttribute("tuftFrame");
   const normal = new THREE.Vector3();
   for (let i = 0; i < positions.count; i += 1) {
     const blend = THREE.MathUtils.smoothstep(Math.abs(positions.getX(i) - plane), 0, 0.025);
+    if (frames) {
+      normal.set(frames.getX(i) * blend, frames.getY(i), frames.getZ(i)).normalize();
+      frames.setXYZ(i, normal.x, normal.y, normal.z);
+    }
     normal.set(normals.getX(i) * blend, normals.getY(i), normals.getZ(i)).normalize();
     normals.setXYZ(i, normal.x, normal.y, normal.z);
     if (directions) {
@@ -600,6 +704,11 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       if (directions) {
         normal.set(directions.getX(i) / (stretched ? 2 : 1), directions.getY(i), directions.getZ(i)).normalize();
         directions.setXYZ(i, normal.x, normal.y, normal.z);
+      }
+      const frames = half.getAttribute("tuftFrame");
+      if (frames) {
+        normal.set(frames.getX(i) / (stretched ? 2 : 1), frames.getY(i), frames.getZ(i)).normalize();
+        frames.setXYZ(i, normal.x, normal.y, normal.z);
       }
     }
     softenMirrorPlane(half, 0);
@@ -856,7 +965,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
     >
       <color attach="background" args={[studio ? "#ebe9e4" : "#d9ded8"]} />
       <ambientLight intensity={0.65} />
-      <directionalLight position={[3, 6, 4]} intensity={2.25} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
+      <directionalLight position={[3, 6, 4]} intensity={2.25} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-normalBias={0.025} />
       <Environment resolution={128}>
         <Lightformer intensity={3} position={[0, 5, 2]} scale={[7, 3, 1]} />
         <Lightformer intensity={1.3} position={[-4, 2, 1]} rotation-y={Math.PI / 2} scale={[4, 2, 1]} />
@@ -866,7 +975,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
         <planeGeometry args={[30, 30]} />
         <meshStandardMaterial color={studio ? "#e3e0da" : "#ccd3cc"} roughness={0.96} />
       </mesh>
-      {grid && <gridHelper args={[12, 24, "#8f948d", "#c4c4bd"]} position-y={0.006} />}
+      {grid && <gridHelper args={[12, 24, "#8f948d", "#c4c4bd"]} position-y={0.006} renderOrder={-1} onUpdate={(helper) => { const material = helper.material as THREE.Material; material.depthWrite = false; material.polygonOffset = true; }} />}
       <Suspense fallback={null}>
         <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} seats={seats} reducedMotion={reducedMotion} wireframe={wireframe} />
       </Suspense>
