@@ -253,7 +253,8 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
           + texture2D(tex, p.xy * surfaceDensity) * weights.z;
       }\n` + shader.fragmentShader;
     if (tuft) {
-      shader.fragmentShader = `uniform sampler2D tuftMap;
+      shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
+        uniform sampler2D tuftMap;
         uniform float tuftDensity;
         float tuftHeight(vec3 p) {
           vec3 w = pow(abs(normalize(surfaceNormal)), vec3(12.0));
@@ -261,8 +262,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
           return dot(vec3(texture2D(tuftMap, p.yz * tuftDensity).r, texture2D(tuftMap, p.xz * tuftDensity).r, texture2D(tuftMap, p.xy * tuftDensity).r), w);
         }
         vec4 surfaceRelief(sampler2D tex, vec3 p) { return vec4(tuftHeight(p) + surfaceSample(tex, p).r * 0.008); }
-        \n` .replace('vec4 surfaceRelief(sampler2D tex, vec3 p) { return vec4(tuftHeight(p) + surfaceSample(tex, p).r * 0.008); }', '') + shader.fragmentShader;
-      shader.fragmentShader = shader.fragmentShader.replace('#include <bumpmap_pars_fragment>', 'vec4 surfaceRelief(sampler2D tex, vec3 p) { return vec4(tuftHeight(p) + surfaceSample(tex, p).r * 0.008); }\n#include <bumpmap_pars_fragment>');
+        \n`);
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.68 + 0.32 * tuftHeight(surfacePosition);');
     }
     if (pattern) {
