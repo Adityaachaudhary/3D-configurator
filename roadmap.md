@@ -24,3 +24,7 @@
 ## Patterned upholstery
 - [x] Add multicolour patterns with matching compact swatch previews and physical-coordinate mapping.
 - [x] Verify patterns on all seating sizes, scale changes, and retained leg finishes.
+## Fabric scale and swatch corrections
+- [x] Connect pattern repeat and plain weave size to the weave-scale control.
+- [x] Prevent canvas preview shrinkage and label every compact fabric swatch.
+- [x] Verify all twelve fabrics on all seaters and compare scale endpoints visually.

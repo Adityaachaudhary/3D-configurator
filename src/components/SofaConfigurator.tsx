@@ -198,7 +198,7 @@ function FabricSwatch({ fabric }: { fabric: FabricPreset }) {
       const color = ctx.getImageData(0, 0, 1, 1).data;
       for (let i = 0; i < 192 * 192; i++) {
         const source = ((Math.floor(i / 192) * 256 + i % 192) * 4);
-        for (let k = 0; k < 3; k++) image.data[i * 4 + k] = (color[k] ?? 0) * (data[source] ?? 255) / 255;
+        for (let k = 0; k < 3; k++) image.data[i * 4 + k] = (color[k] ?? 0) * (data?.[source] ?? 255) / 255;
         image.data[i * 4 + 3] = 255;
       }
       ctx.putImageData(image, 0, 0);
