@@ -612,7 +612,11 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
         makeDefault
         enableDamping
         dampingFactor={0.08}
-        enableZoom={false}
+        enableZoom
+        zoomSpeed={0.9}
+        zoomToCursor
+        minDistance={1.7}
+        maxDistance={7}
         minPolarAngle={0.35}
         maxPolarAngle={Math.PI / 2.02}
         autoRotate={rotate}
