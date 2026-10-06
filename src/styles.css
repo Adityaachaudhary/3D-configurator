@@ -94,6 +94,10 @@
   --fabric-clay: oklch(0.592 0.078 41);
   --fabric-moss: oklch(0.439 0.026 155);
   --fabric-ink: oklch(0.338 0.007 235);
+  --fabric-cognac-leather: oklch(0.55 0.095 55);
+  --fabric-charcoal-leather: oklch(0.29 0.008 235);
+  --fabric-ivory-leather: oklch(0.88 0.018 90);
+  --fabric-olive-leather: oklch(0.43 0.038 130);
   --leg-oak: oklch(0.581 0.078 66);
   --leg-walnut: oklch(0.349 0.046 45);
   --leg-ebonized: oklch(0.246 0.004 128);
