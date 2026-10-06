@@ -119,10 +119,12 @@ function createSurfaceMaps(kind: string) {
       else if (kind === "tuft") {
         const a = (x / size + y / size) % 1;
         const b = ((x / size - y / size) % 1 + 1) % 1;
-        const crown = Math.pow(Math.max(0, Math.sin(a * Math.PI) * Math.sin(b * Math.PI)), 0.55);
+        const crown = Math.pow(Math.max(0, Math.sin(a * Math.PI) * Math.sin(b * Math.PI)), 1.4);
         const edgeA = Math.min(a, 1 - a), edgeB = Math.min(b, 1 - b);
-        const button = Math.exp(-(edgeA * edgeA + edgeB * edgeB) / 0.0012);
-        height = Math.max(0, 0.12 + crown * 0.84 - button * 0.12);
+        const radius = edgeA * edgeA + edgeB * edgeB;
+        const pocket = Math.exp(-radius / 0.0032);
+        const buttonHead = Math.exp(-radius / 0.00022);
+        height = Math.max(0, 0.45 + crown * 0.55 - pocket * 0.28 + buttonHead * 0.12);
       }
       else {
         const warp = Math.cos(u * 32);
@@ -132,7 +134,7 @@ function createSurfaceMaps(kind: string) {
       }
       const i = (y * size + x) * 4;
       const contrast = kind === "wood" ? 0.3 : kind === "leather" ? 0.12 : kind === "velvet" ? 0.045 : 0.10;
-      const value = Math.round(255 * (kind === "tuft" ? 0.65 + height * 0.35 : 0.94 + (height - 0.5) * contrast));
+      const value = Math.round(255 * (kind === "tuft" ? 0.72 + height * 0.28 : 0.94 + (height - 0.5) * contrast));
       for (let k = 0; k < 3; k += 1) {
         colour[i + k] = value;
         relief[i + k] = Math.round(height * 255);
@@ -227,13 +229,25 @@ function FabricSwatch({ fabric }: { fabric: FabricPreset }) {
 const weaveDensity = (value: number) => 5.6 * 7 / (5.5 + (value - 3) * 3 / 11);
 const leatherDensity = (value: number) => 11 - (value - 3) * 8 / 11;
 
+// Smooth periodic profile mirrors createSurfaceMaps("tuft") without mip-level
+// flattening; it is sampled at physical coordinates for both depth and shading.
+const tuftProfileGLSL = `
+  float tuftProfile(vec2 uv) {
+    vec2 cell = fract(vec2(uv.x + uv.y, uv.x - uv.y));
+    vec2 edge = min(cell, 1.0 - cell);
+    float r = dot(edge, edge);
+    float crown = pow(max(0.0, sin(cell.x * 3.14159265) * sin(cell.y * 3.14159265)), 1.4);
+    return max(0.0, 0.45 + 0.55 * crown - 0.28 * exp(-r / 0.0032) + 0.12 * exp(-r / 0.00022));
+  }
+`;
+
 function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null, patternRepeat = density * (8 / 5.6), tuft: THREE.Texture | null = null) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms["surfaceDensity"] = { value: density / scale };
     if (tuft) {
       shader.uniforms["tuftMap"] = { value: tuft };
       shader.uniforms["tuftDensity"] = { value: 4.5 / scale };
-      shader.uniforms["tuftDepth"] = { value: 0.018 * scale };
+      shader.uniforms["tuftDepth"] = { value: 0.004 * scale };
     }
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
@@ -244,17 +258,19 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       // Evaluate in joined world coordinates BEFORE projection: every module
       // uses the same diamond grid, including the reflected chair halves.
       shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>
+        attribute vec3 tuftDirection;
         uniform sampler2D tuftMap;
         uniform float tuftDensity;
         uniform float tuftDepth;
+        ${tuftProfileGLSL}
         float paddedHeight(vec3 p, vec3 n) {
           vec3 w = pow(abs(n), vec3(12.0));
           w /= max(dot(w, vec3(1.0)), 0.0001);
-          return dot(vec3(texture2D(tuftMap, p.yz * tuftDensity).r, texture2D(tuftMap, p.xz * tuftDensity).r, texture2D(tuftMap, p.xy * tuftDensity).r), w);
+          return dot(vec3(tuftProfile(p.yz * tuftDensity), tuftProfile(p.xz * tuftDensity), tuftProfile(p.xy * tuftDensity)), w);
         }`);
       shader.vertexShader = shader.vertexShader.replace("#include <project_vertex>", `
         vec3 tuftOriginalPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
-        vec3 tuftNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));
+        vec3 tuftNormal = normalize(vec3(dot(tuftDirection, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(tuftDirection, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(tuftDirection, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));
         // Recess seams and buttons inside the original envelope; padded crowns
         // retain the supplied sofa dimensions instead of inflating its bounds.
         vec3 tuftOffset = -tuftNormal * tuftDepth * (1.0 - paddedHeight(tuftOriginalPosition, tuftNormal));
@@ -265,7 +281,9 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     shader.vertexShader = shader.vertexShader.replace("#include <worldpos_vertex>", `#include <worldpos_vertex>
       surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
       surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));`);
-    if (tuft) shader.vertexShader = shader.vertexShader.replace("surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;", "surfacePosition = tuftOriginalPosition;");
+    if (tuft) shader.vertexShader = shader.vertexShader
+      .replace("surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;", "surfacePosition = tuftOriginalPosition;")
+      .replace("surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));", "surfaceNormal = tuftNormal;");
     shader.fragmentShader = `varying vec3 surfacePosition;
       varying vec3 surfaceNormal;
       uniform float surfaceDensity;
@@ -280,14 +298,27 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
         uniform sampler2D tuftMap;
         uniform float tuftDensity;
+        ${tuftProfileGLSL}
         float tuftHeight(vec3 p) {
           vec3 w = pow(abs(normalize(surfaceNormal)), vec3(12.0));
           w /= max(dot(w, vec3(1.0)), 0.0001);
-          return dot(vec3(texture2D(tuftMap, p.yz * tuftDensity).r, texture2D(tuftMap, p.xz * tuftDensity).r, texture2D(tuftMap, p.xy * tuftDensity).r), w);
+          return dot(vec3(tuftProfile(p.yz * tuftDensity), tuftProfile(p.xz * tuftDensity), tuftProfile(p.xy * tuftDensity)), w);
         }
-        vec4 surfaceRelief(sampler2D tex, vec3 p) { return vec4(tuftHeight(p) + surfaceSample(tex, p).r * 0.008); }
+        vec4 surfaceRelief(sampler2D tex, vec3 p) { return vec4(tuftHeight(p) + surfaceSample(tex, p).r * 0.075); }
         \n`);
-      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.68 + 0.32 * tuftHeight(surfacePosition);');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.86 + 0.14 * tuftHeight(surfacePosition);');
+      // Use physical surface derivatives: Three's normalized bump derivatives
+      // otherwise flatten large padded forms at normal viewing distances.
+      shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `
+        vec3 paddingDx = dFdx(-vViewPosition);
+        vec3 paddingDy = dFdy(-vViewPosition);
+        vec3 paddingR1 = cross(paddingDy, normal);
+        vec3 paddingR2 = cross(normal, paddingDx);
+        float paddingDet = dot(paddingDx, paddingR1);
+        float paddingHeight = (tuftHeight(surfacePosition) * 0.014 + surfaceSample(bumpMap, surfacePosition).r * 0.00045) * ${scale.toFixed(6)};
+        vec3 paddingGradient = sign(paddingDet) * (dFdx(paddingHeight) * paddingR1 + dFdy(paddingHeight) * paddingR2);
+        normal = normalize(abs(paddingDet) * normal - paddingGradient);
+      `);
     }
     if (pattern) {
       shader.fragmentShader = `uniform sampler2D patternMap;
@@ -315,7 +346,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v5-padded-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
+  material.customProgramCacheKey = () => `physical-surface-v10-supple-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
@@ -393,6 +424,24 @@ function splitSofaGeometry(source: THREE.BufferGeometry) {
   geometry.addGroup(fabric.length, legs.length, 1);
   // The source export contains inconsistent normals on the feet; repair before clipping.
   geometry.computeVertexNormals();
+  // UV/hard-normal duplicates must move together. Keep shading normals intact,
+  // but give coincident upholstery vertices one shared displacement direction.
+  const normals = geometry.getAttribute("normal");
+  const directions = new Map<string, THREE.Vector3>();
+  const keyAt = (i: number) => `${Math.round(position.getX(i) * 10000)}:${Math.round(position.getY(i) * 10000)}:${Math.round(position.getZ(i) * 10000)}`;
+  for (let i = 0; i < position.count; i++) {
+    const key = keyAt(i);
+    const direction = directions.get(key) ?? new THREE.Vector3();
+    direction.x += normals.getX(i); direction.y += normals.getY(i); direction.z += normals.getZ(i);
+    directions.set(key, direction);
+  }
+  directions.forEach((direction) => direction.normalize());
+  const tuftDirections = new Float32Array(position.count * 3);
+  for (let i = 0; i < position.count; i++) {
+    const direction = directions.get(keyAt(i));
+    if (direction) direction.toArray(tuftDirections, i * 3);
+  }
+  geometry.setAttribute("tuftDirection", new THREE.BufferAttribute(tuftDirections, 3));
   return geometry;
 }
 
@@ -464,9 +513,11 @@ function reflectedGeometry(source: THREE.BufferGeometry) {
   const result = source.clone();
   const p = result.getAttribute("position");
   const n = result.getAttribute("normal");
+  const direction = result.getAttribute("tuftDirection");
   for (let i = 0; i < p.count; i += 1) {
     p.setX(i, -p.getX(i));
     n.setX(i, -n.getX(i));
+    if (direction) direction.setX(i, -direction.getX(i));
   }
   for (const attribute of Object.values(result.attributes)) {
     for (let i = 0; i < attribute.count; i += 3) {
@@ -484,11 +535,16 @@ function reflectedGeometry(source: THREE.BufferGeometry) {
 function softenMirrorPlane(geometry: THREE.BufferGeometry, plane: number) {
   const positions = geometry.getAttribute("position");
   const normals = geometry.getAttribute("normal");
+  const directions = geometry.getAttribute("tuftDirection");
   const normal = new THREE.Vector3();
   for (let i = 0; i < positions.count; i += 1) {
     const blend = THREE.MathUtils.smoothstep(Math.abs(positions.getX(i) - plane), 0, 0.025);
     normal.set(normals.getX(i) * blend, normals.getY(i), normals.getZ(i)).normalize();
     normals.setXYZ(i, normal.x, normal.y, normal.z);
+    if (directions) {
+      normal.set(directions.getX(i) * blend, directions.getY(i), directions.getZ(i)).normalize();
+      directions.setXYZ(i, normal.x, normal.y, normal.z);
+    }
   }
 }
 
@@ -535,11 +591,16 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     }
     positions.needsUpdate = true;
     const normals = half.getAttribute("normal");
+    const directions = half.getAttribute("tuftDirection");
     const normal = new THREE.Vector3();
     for (let i = 0; i < positions.count; i += 1) {
       const stretched = positions.getX(i) > -MODULE_WIDTH / 2;
       normal.set(normals.getX(i) / (stretched ? 2 : 1), normals.getY(i), normals.getZ(i)).normalize();
       normals.setXYZ(i, normal.x, normal.y, normal.z);
+      if (directions) {
+        normal.set(directions.getX(i) / (stretched ? 2 : 1), directions.getY(i), directions.getZ(i)).normalize();
+        directions.setXYZ(i, normal.x, normal.y, normal.z);
+      }
     }
     softenMirrorPlane(half, 0);
     half.computeBoundingSphere();
@@ -641,13 +702,13 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const upholstery = new THREE.MeshPhysicalMaterial({
       color: fabricColor,
       ...fabricTexture,
-      bumpScale: selectedFabric.tufted ? 0.020 : leather ? 0.00045 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
-      roughness: leather ? 0.48 : selectedFabric.weave === "velvet" ? 0.78 : 0.91,
+      bumpScale: selectedFabric.tufted ? 0.024 : leather ? 0.00045 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
+      roughness: selectedFabric.tufted ? 0.56 : leather ? 0.48 : selectedFabric.weave === "velvet" ? 0.78 : 0.91,
       metalness: 0,
       sheen: leather ? 0 : selectedFabric.weave === "velvet" ? 0.7 : selectedFabric.weave === "loop" ? 0.3 : 0.18,
       sheenColor: fabricColor.clone().lerp(new THREE.Color(1, 1, 1), 0.35),
-      clearcoat: leather ? 0.16 : 0,
-      clearcoatRoughness: leather ? 0.52 : 0,
+      clearcoat: selectedFabric.tufted ? 0.07 : leather ? 0.16 : 0,
+      clearcoatRoughness: selectedFabric.tufted ? 0.68 : leather ? 0.52 : 0,
       sheenRoughness: 0.85,
     });
     const feet = new THREE.MeshStandardMaterial({
