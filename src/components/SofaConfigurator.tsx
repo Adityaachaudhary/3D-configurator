@@ -975,7 +975,11 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
         <planeGeometry args={[30, 30]} />
         <meshStandardMaterial color={studio ? "#e3e0da" : "#ccd3cc"} roughness={0.96} />
       </mesh>
-      {grid && <gridHelper args={[12, 24, "#8f948d", "#c4c4bd"]} position-y={0.006} renderOrder={-1} onUpdate={(helper) => { const material = helper.material as THREE.Material; material.depthWrite = false; material.polygonOffset = true; }} />}
+      {grid && <gridHelper name="floor-grid" args={[12, 24, "#8f948d", "#c4c4bd"]} position-y={0.006} renderOrder={1} onUpdate={(helper) => {
+        // Draw after the opaque floor, but keep depth testing so the sofa occludes the lines.
+        const materials = Array.isArray(helper.material) ? helper.material : [helper.material];
+        materials.forEach((material) => { material.depthWrite = false; });
+      }} />}
       <Suspense fallback={null}>
         <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} seats={seats} reducedMotion={reducedMotion} wireframe={wireframe} />
       </Suspense>
@@ -1003,7 +1007,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
 
 function ToolButton({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <Button type="button" variant={active ? "selected" : "outline"} size="icon" onClick={onClick} aria-label={label} title={label}>
+    <Button type="button" variant={active ? "selected" : "outline"} size="icon" onClick={onClick} aria-label={label} aria-pressed={active} title={label}>
       {children}
     </Button>
   );
