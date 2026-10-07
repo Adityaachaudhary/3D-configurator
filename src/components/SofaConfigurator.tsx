@@ -373,7 +373,6 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     }
     if (undersideColor) {
       shader.fragmentShader = "uniform vec3 undersideColor;\n" + shader.fragmentShader;
-      shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>`);
       // Insert AFTER pattern/tuft colour so neither can repaint the lining.
       shader.fragmentShader = shader.fragmentShader.replace("#include <alphamap_fragment>", `
         if (normalize(surfaceFacingNormal).y < -0.6) diffuseColor.rgb = undersideColor;
@@ -870,14 +869,22 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       metalness: selectedLeg.metalness,
     });
     // A neutral dark lining replaces stretched upholstery under the base.
-    const undersideColor = new THREE.Color().setRGB(0.08, 0.08, 0.08, THREE.LinearSRGBColorSpace);
+    let undersideColor = new THREE.Color();
+    if (colorContext) {
+      colorContext.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--fabric-underside").trim();
+      colorContext.fillRect(0, 0, 1, 1);
+      const rgb = colorContext.getImageData(0, 0, 1, 1).data;
+      undersideColor.setRGB((rgb[0] ?? 0) / 255, (rgb[1] ?? 0) / 255, (rgb[2] ?? 0) / 255, THREE.SRGBColorSpace);
+    }
+    upholstery.userData["undersideColor"] = undersideColor;
     projectSurface(upholstery, leather ? leatherDensity(textureScale) : weaveDensity(textureScale), scale, patternTexture, 56 / textureScale, tuftTexture?.bumpMap ?? null, undersideColor);
     projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
   }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture, tuftTexture]);
   const chairMaterials = useMemo(() => materials.map((material, i) => {
     const clone = material.clone();
-    projectSurface(clone, i === 0 ? selectedFabric.weave === "leather" ? leatherDensity(textureScale) : weaveDensity(textureScale) : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null, 56 / textureScale, i === 0 ? tuftTexture?.bumpMap ?? null : null, i === 0 ? new THREE.Color().setRGB(0.08, 0.08, 0.08, THREE.LinearSRGBColorSpace) : null);
+    const lining = material.userData["undersideColor"];
+    projectSurface(clone, i === 0 ? selectedFabric.weave === "leather" ? leatherDensity(textureScale) : weaveDensity(textureScale) : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null, 56 / textureScale, i === 0 ? tuftTexture?.bumpMap ?? null : null, i === 0 && lining instanceof THREE.Color ? lining : null);
     return clone;
   }), [materials, textureScale, leg, scale, patternTexture, selectedFabric.weave, tuftTexture]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
