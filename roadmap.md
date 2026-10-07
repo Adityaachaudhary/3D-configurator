@@ -55,3 +55,9 @@
 ## Subtle interface refinement and floor grid
 - [x] Restore the visible floor grid and verify its toggle.
 - [x] Refine the interface subtly without changing its theme or working features.
+## Fabric artefact corrections
+- [x] Apply renderer-maximum anisotropy and mipmaps to all upholstery textures; use 1024px patterned tiles.
+- [x] Diagnose black-leather facets with relief disabled and correct shading without removing leather detail.
+- [x] Replace downward-facing patterned upholstery with a plain dark underside.
+- [x] Antialias analytic Chesterfield dents and highlights while preserving padded depth.
+- [x] Verify the four fixes across all seating variants and retain accurate dimensions and controls.
