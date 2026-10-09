@@ -1,0 +1,21 @@
+{
+  "originalTriangles": 173612,
+  "optimizedTriangles": 138888,
+  "retainRatio": 0.8,
+  "removedPercent": 20.00092159528143,
+  "originalVertices": 97195,
+  "optimizedVertices": 79725,
+  "protectedVertices": 32076,
+  "protectedVerticesRetained": true,
+  "joinPlanes": [
+    -0.7,
+    -0.35,
+    0,
+    0.35,
+    0.7
+  ],
+  "maxErrorMeters": 0.001,
+  "measuredErrorMeters": 0.00020917145593557507,
+  "originalBytes": 22451204,
+  "optimizedBytes": 21475428
+}
