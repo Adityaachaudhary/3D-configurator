@@ -36,6 +36,7 @@ import wisdomAsset from "@/assets/wisdom-fabric.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
+import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "pearl" | "moss" | "ocean-stripe" | "olive-check" | "rose-check" | "ochre-chevron" | "teal-diamond" | "graphite-stripe" | "cognac-leather" | "charcoal-leather" | "ivory-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "stripe" | "check" | "chevron" | "diamond";
@@ -277,8 +278,8 @@ function FabricSwatch({ fabric }: { fabric: FabricPreset }) {
 }
 
 // Restrict thread size to a believable range; printed repeat size remains independently adjustable.
-const weaveDensity = (value: number) => 5.6 * 7 / (5.5 + (value - 3) * 3 / 11);
-const leatherDensity = (value: number) => 11 - (value - 3) * 8 / 11;
+const weaveDensity = tileDensity;
+const leatherDensity = tileDensity;
 
 // Smooth periodic profile mirrors createSurfaceMaps("tuft") without mip-level
 // flattening; it is sampled at physical coordinates for both depth and shading.
@@ -299,20 +300,24 @@ const tuftProfileGLSL = `
     return clamp(0.30 + 0.62 * crown + 0.08 * pleat - 0.34 * exp(-r / 0.0055) + 0.16 * detail * exp(-r / 0.00035), 0.0, 1.0);
   }
   float tuftProfile(vec2 uv, float detail) { return tuftProfile(uv, detail, vec2(0.0)); }
+  // Independent sewn-panel coordinates. Use joined world coordinates so a
+  // clipped/reflected module never restarts the repeat at its cut boundary.
+  vec2 seatTuftUV(vec3 p) { return p.xz + vec2(0.035, -0.025); }
+  vec2 backTuftUV(vec3 p) { return p.xy + vec2(0.035, 0.075); }
+  vec2 armTuftUV(vec3 p) { return p.zy + vec2(-0.025, 0.045); }
   float tuftPanelMask(vec3 n) {
     vec3 a = abs(n);
     return smoothstep(0.64, 0.78, max(a.x, max(a.y, a.z)));
   }
 `;
 
-function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null, patternRepeat = density * (8 / 5.6), tuft: THREE.Texture | null = null, undersideColor: THREE.Color | null = null) {
+function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null, patternRepeat = density * (8 / 5.6), tuft = false, undersideColor: THREE.Color | null = null, photo = false) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms["surfaceDensity"] = { value: density / scale };
     if (undersideColor) shader.uniforms["undersideColor"] = { value: undersideColor };
     if (tuft) {
-      shader.uniforms["tuftMap"] = { value: tuft };
       shader.uniforms["tuftDensity"] = { value: 4.5 / scale };
-      shader.uniforms["tuftDepth"] = { value: 0.013 * scale };
+      shader.uniforms["tuftDepth"] = { value: 0.0015 * scale };
     }
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
@@ -325,7 +330,6 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>
         attribute vec3 tuftDirection;
         attribute vec4 tuftFrame;
-        uniform sampler2D tuftMap;
         uniform float tuftDensity;
         uniform float tuftDepth;
         varying float vTuftMask;
@@ -333,7 +337,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         float paddedHeight(vec3 p, vec3 n) {
           vec3 w = pow(abs(n), vec3(12.0));
           w /= max(dot(w, vec3(1.0)), 0.0001);
-          return dot(vec3(tuftProfile(p.yz * tuftDensity, 0.0), tuftProfile(p.xz * tuftDensity, 0.0), tuftProfile(p.xy * tuftDensity, 0.0)), w);
+          return dot(vec3(tuftProfile(armTuftUV(p) * tuftDensity, 0.0), tuftProfile(seatTuftUV(p) * tuftDensity, 0.0), tuftProfile(backTuftUV(p) * tuftDensity, 0.0)), w);
         }`);
       shader.vertexShader = shader.vertexShader.replace("#include <project_vertex>", `
         vec3 tuftOriginalPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
@@ -369,13 +373,20 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       vec4 surfaceSample(sampler2D tex, vec3 p) {
         vec3 weights = pow(abs(normalize(surfaceNormal)), vec3(6.0));
         weights /= max(weights.x + weights.y + weights.z, 0.0001);
-        return texture2D(tex, p.yz * surfaceDensity) * weights.x
-          + texture2D(tex, p.xz * surfaceDensity) * weights.y
-          + texture2D(tex, p.xy * surfaceDensity) * weights.z;
+        vec3 tileP = p * surfaceDensity;
+        ${photo ? `// Distinct cutting phases/quarter-turn for arms, seats and back.
+        // All three photo maps use these same coordinates; never offset by module.
+        vec2 armUV = vec2(-tileP.y, tileP.z) + vec2(0.37, 0.19);
+        vec2 seatUV = tileP.xz + vec2(0.11, 0.43);
+        vec2 backUV = tileP.xy + vec2(0.61, 0.07);` : `vec2 armUV = tileP.yz;
+        vec2 seatUV = tileP.xz;
+        vec2 backUV = tileP.xy;`}
+        return texture2D(tex, armUV) * weights.x
+          + texture2D(tex, seatUV) * weights.y
+          + texture2D(tex, backUV) * weights.z;
       }\n` + shader.fragmentShader;
     if (tuft) {
       shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
-        uniform sampler2D tuftMap;
         uniform float tuftDensity;
         varying float vTuftMask;
         ${tuftProfileGLSL}
@@ -384,11 +395,13 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
           w /= max(dot(w, vec3(1.0)), 0.0001);
           // Fade button heads once they shrink below a pixel to avoid sparkle.
           float detail = 1.0 - smoothstep(0.012, 0.04, length(fwidth(surfacePosition)) * tuftDensity);
-          vec3 uv = p * tuftDensity;
+          vec2 armUV = armTuftUV(p) * tuftDensity;
+          vec2 seatUV = seatTuftUV(p) * tuftDensity;
+          vec2 backUV = backTuftUV(p) * tuftDensity;
           vec3 h3 = vec3(
-            tuftProfile(uv.yz, detail, fwidth(vec2(uv.y + uv.z, uv.y - uv.z))),
-            tuftProfile(uv.xz, detail, fwidth(vec2(uv.x + uv.z, uv.x - uv.z))),
-            tuftProfile(uv.xy, detail, fwidth(vec2(uv.x + uv.y, uv.x - uv.y))));
+            tuftProfile(armUV, detail, fwidth(vec2(armUV.x + armUV.y, armUV.x - armUV.y))),
+            tuftProfile(seatUV, detail, fwidth(vec2(seatUV.x + seatUV.y, seatUV.x - seatUV.y))),
+            tuftProfile(backUV, detail, fwidth(vec2(backUV.x + backUV.y, backUV.x - backUV.y))));
           float h = dot(h3, w);
           return mix(1.0, h, clamp(vTuftMask, 0.0, 1.0));
         }
@@ -408,7 +421,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         float paddingDet = dot(paddingDx, paddingR1);
         float paddingHeight = (tuftShade * 0.042 + surfaceSample(bumpMap, surfacePosition).r * 0.00045) * ${scale.toFixed(6)};
         vec3 paddingGradient = sign(paddingDet) * (dFdx(paddingHeight) * paddingR1 + dFdy(paddingHeight) * paddingR2);
-        normal = normalize(abs(paddingDet) * normal - paddingGradient);
+        normal = normalize(max(abs(paddingDet), 0.00000001) * normal - paddingGradient);
       `);
     }
     if (pattern) {
@@ -449,7 +462,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v17-base-lining-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}-${undersideColor ? "lined" : "unlined"}`;
+  material.customProgramCacheKey = () => `physical-surface-v18-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
@@ -884,12 +897,10 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     [selectedFabric.weave, selectedFabric.photo, wisdomPhoto],
   );
   const legTexture = useMemo(() => createSurfaceMaps(leg === "steel" ? "steel" : "wood"), [leg]);
-  const tuftTexture = useMemo(() => selectedFabric.tufted ? createSurfaceMaps("tuft") : null, [selectedFabric.tufted]);
-  useEffect(() => () => { if (tuftTexture) Object.values(tuftTexture).forEach((map) => map.dispose()); }, [tuftTexture]);
   useEffect(() => () => Object.values(fabricTexture).forEach((map) => map.dispose()), [fabricTexture]);
   useEffect(() => () => Object.values(legTexture).forEach((map) => map.dispose()), [legTexture]);
   useEffect(() => {
-    const surfaces = [fabricTexture, legTexture, ...(tuftTexture ? [tuftTexture] : [])];
+    const surfaces = [fabricTexture, legTexture];
     const colorTextures = new Set<THREE.Texture>([...surfaces.map((surface) => surface.map), ...(patternTexture ? [patternTexture] : [])]);
     const textures = [...surfaces.flatMap((surface) => Object.values(surface)), ...(patternTexture ? [patternTexture] : [])];
     for (const texture of textures) {
@@ -900,7 +911,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       texture.magFilter = THREE.LinearFilter;
       texture.needsUpdate = true;
     }
-  }, [gl, fabricTexture, legTexture, tuftTexture, patternTexture]);
+  }, [gl, fabricTexture, legTexture, patternTexture]);
   const materials = useMemo(() => {
     const leather = selectedFabric.weave === "leather";
     const colorCanvas = document.createElement("canvas");
@@ -935,16 +946,16 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       undersideColor.setRGB((rgb[0] ?? 0) / 255, (rgb[1] ?? 0) / 255, (rgb[2] ?? 0) / 255, THREE.SRGBColorSpace);
     }
     upholstery.userData["undersideColor"] = undersideColor;
-    projectSurface(upholstery, leather ? leatherDensity(textureScale) : weaveDensity(textureScale), scale, patternTexture, 56 / textureScale, tuftTexture?.bumpMap ?? null, undersideColor);
+    projectSurface(upholstery, leather ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale), scale, patternTexture, tileDensity(textureScale), selectedFabric.tufted ?? false, undersideColor, Boolean(selectedFabric.photo));
     projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
-  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture, tuftTexture]);
+  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture]);
   const chairMaterials = useMemo(() => materials.map((material, i) => {
     const clone = material.clone();
     const lining = material.userData["undersideColor"];
-    projectSurface(clone, i === 0 ? selectedFabric.weave === "leather" ? leatherDensity(textureScale) : weaveDensity(textureScale) : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null, 56 / textureScale, i === 0 ? tuftTexture?.bumpMap ?? null : null, i === 0 && lining instanceof THREE.Color ? lining : null);
+    projectSurface(clone, i === 0 ? selectedFabric.weave === "leather" ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale) : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null, tileDensity(textureScale), i === 0 && Boolean(selectedFabric.tufted), i === 0 && lining instanceof THREE.Color ? lining : null, i === 0 && Boolean(selectedFabric.photo));
     return clone;
-  }), [materials, textureScale, leg, scale, patternTexture, selectedFabric.weave, tuftTexture]);
+  }), [materials, textureScale, leg, scale, patternTexture, selectedFabric]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
   useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
   useEffect(() => {
@@ -1152,7 +1163,7 @@ export function SofaConfigurator() {
   const reducedMotion = useReducedMotion();
   const [fabric, setFabric] = useState<FabricId>("oat");
   const [leg, setLeg] = useState<LegId>("oak");
-  const [textureScale, setTextureScale] = useState(7);
+  const [textureScale, setTextureScale] = useState(DEFAULT_TILE_CM);
   const [scale, setScale] = useState(1);
   const [grid, setGrid] = useState(true);
   const [measures, setMeasures] = useState(true);
@@ -1164,7 +1175,7 @@ export function SofaConfigurator() {
   const [zoomSignal, setZoomSignal] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
   const reset = useCallback(() => {
-    setSeats(2); setFabric("oat"); setLeg("oak"); setTextureScale(7); setScale(1); setGrid(true); setMeasures(true); setRotate(false); setStudio(true); setWireframe(false); setUnit("cm"); setView("perspective");
+    setSeats(2); setFabric("oat"); setLeg("oak"); setTextureScale(DEFAULT_TILE_CM); setScale(1); setGrid(true); setMeasures(true); setRotate(false); setStudio(true); setWireframe(false); setUnit("cm"); setView("perspective");
   }, []);
   const screenshot = () => {
     const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-viewer-canvas='true']");
@@ -1257,7 +1268,7 @@ export function SofaConfigurator() {
               ))}
               </div>
             </div>)}
-            <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">Weave scale</span><span className="font-mono text-muted-foreground">{textureScale}×</span></span><input aria-label="Weave scale" className="mt-2 w-full accent-primary" type="range" min="3" max="14" step="1" value={textureScale} onChange={(event) => setTextureScale(Number(event.target.value))} /></label>
+            <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">{selectedFabric.weave === "leather" ? "Grain tile" : selectedFabric.pattern || selectedFabric.photo ? "Pattern tile" : "Weave tile"}</span><span className="font-mono text-muted-foreground">{textureScale.toFixed(1)} cm / tile</span></span><input aria-label="Texture tile size" className="mt-2 w-full accent-primary" type="range" min={MIN_TILE_CM} max={MAX_TILE_CM} step="0.5" value={textureScale} onChange={(event) => setTextureScale(Number(event.target.value))} /></label>
           </section>
           <div className="my-4 h-px bg-border" />
           <section>
