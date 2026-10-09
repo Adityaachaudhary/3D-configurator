@@ -71,3 +71,7 @@
 ## Client Wisdom fabric
 - [x] Replace Sage Weave with the uploaded Wisdom photograph in the sidebar and upholstery.
 - [x] Verify the photo finish on all seating sizes, scale adjustment and unchanged legs.
+## Physical material realism
+- [x] Apply and test separate physical recipes for woven fabric, velvet, leather and legs.
+- [x] Soften studio lighting and add contact shadows without hiding the floor grid.
+- [x] Diagnose cushion lumps with plain grey shading and verify finishes on all seating sizes.
