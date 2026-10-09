@@ -1,5 +1,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
+  ContactShadows,
   Environment,
   Lightformer,
   Line,
@@ -34,6 +35,7 @@ import sofaAsset from "@/assets/Panache-OPAA-80pct.glb.asset.json";
 import wisdomAsset from "@/assets/wisdom-fabric.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { materialRecipe } from "@/lib/material-recipes";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "pearl" | "moss" | "ocean-stripe" | "olive-check" | "rose-check" | "ochre-chevron" | "teal-diamond" | "graphite-stripe" | "cognac-leather" | "charcoal-leather" | "ivory-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "stripe" | "check" | "chevron" | "diamond";
@@ -910,20 +912,14 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       color: fabricColor,
       ...fabricTexture,
       bumpScale: selectedFabric.tufted ? 0.024 : leather ? 0.00045 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
-      roughness: selectedFabric.tufted ? 0.56 : leather ? 0.48 : selectedFabric.weave === "velvet" ? 0.78 : 0.91,
-      metalness: 0,
-      sheen: leather ? 0 : selectedFabric.weave === "velvet" ? 0.7 : selectedFabric.weave === "loop" ? 0.3 : 0.18,
+      ...materialRecipe(leather ? "leather" : selectedFabric.weave === "velvet" ? "velvet" : "woven", selectedFabric.tufted),
       sheenColor: fabricColor.clone().lerp(new THREE.Color(1, 1, 1), 0.35),
-      clearcoat: selectedFabric.tufted ? 0.07 : leather ? 0.16 : 0,
-      clearcoatRoughness: selectedFabric.tufted ? 0.68 : leather ? 0.52 : 0,
-      sheenRoughness: 0.85,
     });
-    const feet = new THREE.MeshStandardMaterial({
+    const feet = new THREE.MeshPhysicalMaterial({
       color: selectedLeg.color,
       ...legTexture,
       bumpScale: leg === "steel" ? 0.000008 : 0.000025,
-      roughness: selectedLeg.roughness,
-      metalness: selectedLeg.metalness,
+      ...materialRecipe(leg === "steel" ? "steel" : "wood"),
     });
     // A neutral dark lining replaces stretched upholstery under the base.
     let undersideColor = new THREE.Color();
@@ -1059,6 +1055,28 @@ function CameraRig({ controlsRef, view, zoomSignal, seats, scale, reducedMotion 
   return null;
 }
 
+// Capture after the seating transition settles, not on every orbit frame.
+// Remount for size/scale changes; finite captures keep software GPUs usable.
+function SofaContactShadows({ seats, scale }: { seats: SeatCount; scale: number }) {
+  const revision = `${seats}-${scale}`;
+  const [settled, setSettled] = useState<string | null>(null);
+  const color = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return new THREE.Color().getStyle();
+    context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--scene-contact-shadow").trim();
+    context.fillRect(0, 0, 1, 1);
+    const pixel = context.getImageData(0, 0, 1, 1).data;
+    return new THREE.Color().setRGB((pixel[0] ?? 0) / 255, (pixel[1] ?? 0) / 255, (pixel[2] ?? 0) / 255, THREE.SRGBColorSpace).getStyle();
+  }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(revision), 700);
+    return () => window.clearTimeout(timer);
+  }, [revision]);
+  if (settled !== revision) return null;
+  return <ContactShadows key={revision} name="sofa-contact-shadow" position={[0, 0.009, 0]} scale={6} far={1.5} opacity={0.38} blur={2.5} resolution={256} frames={1} color={color} depthWrite={false} renderOrder={2} />;
+}
+
 function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate, studio, view, zoomSignal, seats, reducedMotion, wireframe }: {
   fabric: FabricId; leg: LegId; textureScale: number; scale: number; grid: boolean; measures: boolean; unit: Unit; rotate: boolean; studio: boolean; view: ViewName; zoomSignal: number; seats: SeatCount; reducedMotion: boolean; wireframe: boolean;
 }) {
@@ -1072,12 +1090,12 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       onCreated={({ gl }) => { gl.domElement.dataset["viewerCanvas"] = "true"; }}
     >
       <color attach="background" args={[studio ? "#ebe9e4" : "#d9ded8"]} />
-      <ambientLight intensity={0.65} />
-      <directionalLight position={[3, 6, 4]} intensity={2.25} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-normalBias={0.025} />
-      <Environment resolution={128}>
-        <Lightformer intensity={3} position={[0, 5, 2]} scale={[7, 3, 1]} />
-        <Lightformer intensity={1.3} position={[-4, 2, 1]} rotation-y={Math.PI / 2} scale={[4, 2, 1]} />
-        <Lightformer intensity={1.1} position={[4, 1, -2]} rotation-y={-Math.PI / 2} scale={[3, 2, 1]} />
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[-3, 6, 4]} intensity={0.9} />
+      <Environment resolution={256}>
+        <Lightformer form="rect" intensity={2.2} position={[-3, 5, 4]} target={[0, 0.4, 0]} scale={[7, 5, 1]} />
+        <Lightformer form="rect" intensity={1} position={[4, 2, 3]} target={[0, 0.4, 0]} scale={[6, 4, 1]} />
+        <Lightformer form="rect" intensity={0.85} position={[1, 4, -4]} target={[0, 0.4, 0]} scale={[5, 3, 1]} />
       </Environment>
       <mesh rotation-x={-Math.PI / 2} position-y={0} receiveShadow>
         <planeGeometry args={[30, 30]} />
@@ -1090,6 +1108,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       }} />}
       <Suspense fallback={null}>
         <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} seats={seats} reducedMotion={reducedMotion} wireframe={wireframe} />
+        <SofaContactShadows seats={seats} scale={scale} />
       </Suspense>
       {measures && <Dimensions scale={scale} unit={unit} seats={seats} reducedMotion={reducedMotion} />}
       <OrbitControls
