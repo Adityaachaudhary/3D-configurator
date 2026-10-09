@@ -25,3 +25,4 @@
 - Smooth coincident upholstery shading normals without welding or moving geometry; leave leg normals intact because the source UV splits otherwise leave visible leather facets.
 - Detect upholstery undersides with a separate inverse-transpose world-space facing normal, not the smoothed tuft projection frame, so downward faces receive plain lining without changing legs.
 - Antialias the analytic tuft profile using per-projection pixel footprints only in fragment shading; retain derivative-free vertex relief so padded depth and joined geometry remain stable.
+- Optimize the sofa offline with the reproducible `scripts/optimize-sofa.mjs` Meshoptimizer pass and a separate asset pointer; retain the original, lock full triangles crossing module cut bands plus legs/base and silhouette extremes, and use normal-weighted simplification with a strict geometric error budget to preserve curves without runtime simplification.
