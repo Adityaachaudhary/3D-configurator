@@ -78,4 +78,4 @@
 ## Texture foundations and filtering
 - [x] Explicitly set colour/data spaces, ACES exposure and scene-level environment intensity.
 - [x] Enforce maximum anisotropy and linear mipmap filtering, and increase tuft tiles to 2048px while retaining analytic antialiasing.
-- [ ] Verify velvet and Chesterfield across all seating sizes in the live viewer.
+- [x] Verify velvet and Chesterfield across all seating sizes in the live viewer.
