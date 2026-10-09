@@ -269,7 +269,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       shader.uniforms["patternMap"] = { value: pattern };
       shader.uniforms["patternDensity"] = { value: patternRepeat / scale };
     }
-    shader.vertexShader = "varying vec3 surfacePosition; varying vec3 surfaceNormal; varying vec3 surfaceFacingNormal;\n" + shader.vertexShader;
+    shader.vertexShader = "varying vec3 surfacePosition; varying vec3 surfaceNormal; varying vec3 surfaceFacingNormal; varying float surfaceBaseHeight;\n" + shader.vertexShader;
     if (tuft) {
       // Evaluate in joined world coordinates BEFORE projection: every module
       // uses the same diamond grid, including the reflected chair halves.
@@ -304,6 +304,9 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       // transformedNormal uses the inverse-transpose normal matrix in view space.
       // Convert it to world space; keep it separate from the tuft projection frame.
       surfaceFacingNormal = inverseTransformDirection(transformedNormal, viewMatrix);
+      // Source-space height is stable across seating calibration, scale and
+      // tuft displacement. Only the hidden base gets lining, never cushions.
+      surfaceBaseHeight = position.y;
       surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
       surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));`);
     if (tuft) shader.vertexShader = shader.vertexShader
@@ -312,6 +315,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     shader.fragmentShader = `varying vec3 surfacePosition;
       varying vec3 surfaceNormal;
       varying vec3 surfaceFacingNormal;
+      varying float surfaceBaseHeight;
       uniform float surfaceDensity;
       vec4 surfaceSample(sampler2D tex, vec3 p) {
         vec3 weights = pow(abs(normalize(surfaceNormal)), vec3(6.0));
@@ -373,9 +377,13 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     }
     if (undersideColor) {
       shader.fragmentShader = "uniform vec3 undersideColor;\n" + shader.fragmentShader;
-      // Insert AFTER pattern/tuft colour so neither can repaint the lining.
+      // Facing down alone also catches visible cushion folds. Restrict lining
+      // to the base underside below the welt and fade both boundaries, leaving
+      // exposed folds in the selected fabric with ordinary lighting/shadows.
       shader.fragmentShader = shader.fragmentShader.replace("#include <alphamap_fragment>", `
-        if (normalize(surfaceFacingNormal).y < -0.6) diffuseColor.rgb = undersideColor;
+        float baseLiningMask = (1.0 - smoothstep(-0.320, -0.305, surfaceBaseHeight))
+          * (1.0 - smoothstep(-0.85, -0.60, normalize(surfaceFacingNormal).y));
+        diffuseColor.rgb = mix(diffuseColor.rgb, undersideColor, baseLiningMask);
         #include <alphamap_fragment>`);
     }
     // Three leaves these chunks unexpanded at onBeforeCompile time.
@@ -392,7 +400,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v16-filtered-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}-${undersideColor ? "lined" : "unlined"}`;
+  material.customProgramCacheKey = () => `physical-surface-v17-base-lining-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft?.uuid ?? "smooth"}-${undersideColor ? "lined" : "unlined"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
