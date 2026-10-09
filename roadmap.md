@@ -66,5 +66,5 @@
 - [x] Check reduction and protected vertices with automated tests; confirm unchanged geometry bounds.
 - [x] Verify all seating sizes with linen, patterned upholstery and Chesterfield before using the optimized copy.
 ## Natural cushion folds
-- [ ] Restrict dark lining to the hidden base underside and blend its boundary smoothly.
-- [ ] Verify light fabrics and Chesterfield folds across seating sizes without changing padding or dimensions.
+- [x] Restrict dark lining to the hidden base underside and blend its boundary smoothly.
+- [x] Verify light fabrics and Chesterfield folds across seating sizes without changing padding or dimensions.
