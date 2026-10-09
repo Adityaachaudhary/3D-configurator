@@ -105,7 +105,7 @@ function formatDimension(meters: number, unit: Unit) {
 // Neutral microstructure keeps the selected colour from being multiplied twice.
 // All maps use the same physical projection, independent of the imported UV atlas.
 function createSurfaceMaps(kind: string) {
-  const size = 256;
+  const size = kind === "tuft" ? 2048 : 256;
   const colour = new Uint8Array(size * size * 4);
   const relief = new Uint8Array(size * size * 4);
   const rough = new Uint8Array(size * size * 4);
@@ -889,10 +889,15 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   useEffect(() => () => Object.values(fabricTexture).forEach((map) => map.dispose()), [fabricTexture]);
   useEffect(() => () => Object.values(legTexture).forEach((map) => map.dispose()), [legTexture]);
   useEffect(() => {
-    const textures = [...Object.values(fabricTexture), ...Object.values(legTexture), ...Object.values(tuftTexture ?? {}), ...(patternTexture ? [patternTexture] : [])];
+    const surfaces = [fabricTexture, legTexture, ...(tuftTexture ? [tuftTexture] : [])];
+    const colorTextures = new Set<THREE.Texture>([...surfaces.map((surface) => surface.map), ...(patternTexture ? [patternTexture] : [])]);
+    const textures = [...surfaces.flatMap((surface) => Object.values(surface)), ...(patternTexture ? [patternTexture] : [])];
     for (const texture of textures) {
+      texture.colorSpace = colorTextures.has(texture) ? THREE.SRGBColorSpace : THREE.NoColorSpace;
       texture.anisotropy = gl.capabilities.getMaxAnisotropy();
       texture.generateMipmaps = true;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
       texture.needsUpdate = true;
     }
   }, [gl, fabricTexture, legTexture, tuftTexture, patternTexture]);
@@ -1086,13 +1091,13 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       shadows
       dpr={[1, 1.75]}
       camera={{ position: VIEWS.perspective, fov: 40, near: 0.1, far: 100 }}
-      gl={{ antialias: true, preserveDrawingBuffer: true }}
+      gl={{ antialias: true, preserveDrawingBuffer: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.95, outputColorSpace: THREE.SRGBColorSpace }}
       onCreated={({ gl, camera }) => { gl.domElement.dataset["viewerCanvas"] = "true"; camera.layers.enable(1); }}
     >
       <color attach="background" args={[studio ? "#ebe9e4" : "#d9ded8"]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[-3, 6, 4]} intensity={0.9} />
-      <Environment resolution={256}>
+      <Environment resolution={256} environmentIntensity={1}>
         <Lightformer form="rect" intensity={2.2} position={[-3, 5, 4]} target={[0, 0.4, 0]} scale={[7, 5, 1]} />
         <Lightformer form="rect" intensity={1} position={[4, 2, 3]} target={[0, 0.4, 0]} scale={[6, 4, 1]} />
         <Lightformer form="rect" intensity={0.85} position={[1, 4, -4]} target={[0, 0.4, 0]} scale={[5, 3, 1]} />
