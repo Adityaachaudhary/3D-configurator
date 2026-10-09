@@ -1087,7 +1087,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       dpr={[1, 1.75]}
       camera={{ position: VIEWS.perspective, fov: 40, near: 0.1, far: 100 }}
       gl={{ antialias: true, preserveDrawingBuffer: true }}
-      onCreated={({ gl }) => { gl.domElement.dataset["viewerCanvas"] = "true"; }}
+      onCreated={({ gl, camera }) => { gl.domElement.dataset["viewerCanvas"] = "true"; camera.layers.enable(1); }}
     >
       <color attach="background" args={[studio ? "#ebe9e4" : "#d9ded8"]} />
       <ambientLight intensity={0.5} />
@@ -1097,11 +1097,13 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
         <Lightformer form="rect" intensity={1} position={[4, 2, 3]} target={[0, 0.4, 0]} scale={[6, 4, 1]} />
         <Lightformer form="rect" intensity={0.85} position={[1, 4, -4]} target={[0, 0.4, 0]} scale={[5, 3, 1]} />
       </Environment>
-      <mesh rotation-x={-Math.PI / 2} position-y={0} receiveShadow>
+      <mesh rotation-x={-Math.PI / 2} position-y={0} receiveShadow onUpdate={(floor) => floor.layers.set(1)}>
         <planeGeometry args={[30, 30]} />
         <meshStandardMaterial color={studio ? "#e3e0da" : "#ccd3cc"} roughness={0.96} />
       </mesh>
       {grid && <gridHelper name="floor-grid" args={[12, 24, "#8f948d", "#c4c4bd"]} position-y={0.006} renderOrder={1} onUpdate={(helper) => {
+        // The contact camera sees layer 0 only: never bake floor/grid into shadows.
+        helper.layers.set(1);
         // Draw after the opaque floor, but keep depth testing so the sofa occludes the lines.
         const materials = Array.isArray(helper.material) ? helper.material : [helper.material];
         materials.forEach((material) => { material.depthWrite = false; });
