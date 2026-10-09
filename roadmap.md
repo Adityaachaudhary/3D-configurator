@@ -75,3 +75,7 @@
 - [x] Apply and test separate physical recipes for woven fabric, velvet, leather and legs.
 - [x] Soften studio lighting and add contact shadows without hiding the floor grid.
 - [x] Diagnose cushion lumps with plain grey shading and verify finishes on all seating sizes.
+## Texture foundations and filtering
+- [x] Explicitly set colour/data spaces, ACES exposure and scene-level environment intensity.
+- [x] Enforce maximum anisotropy and linear mipmap filtering, and increase tuft tiles to 2048px while retaining analytic antialiasing.
+- [ ] Verify velvet and Chesterfield across all seating sizes in the live viewer.
