@@ -70,4 +70,4 @@
 - [x] Verify light fabrics and Chesterfield folds across seating sizes without changing padding or dimensions.
 ## Client Wisdom fabric
 - [x] Replace Sage Weave with the uploaded Wisdom photograph in the sidebar and upholstery.
-- [ ] Verify the photo finish on all seating sizes, scale adjustment and unchanged legs.
+- [x] Verify the photo finish on all seating sizes, scale adjustment and unchanged legs.
