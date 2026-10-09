@@ -61,3 +61,7 @@
 - [x] Replace downward-facing patterned upholstery with a plain dark underside.
 - [x] Antialias analytic Chesterfield dents and highlights while preserving padded depth.
 - [x] Verify the four fixes across all seating variants and retain accurate dimensions and controls.
+## Conservative triangle reduction
+- [x] Create a separate sofa asset with 20% fewer triangles, preserving module cut bands, legs and cushion curves.
+- [x] Check reduction and protected vertices with automated tests; confirm unchanged geometry bounds.
+- [x] Verify all seating sizes with linen, patterned upholstery and Chesterfield before using the optimized copy.

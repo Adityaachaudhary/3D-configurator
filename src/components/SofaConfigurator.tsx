@@ -29,7 +29,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type React
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
-import sofaAsset from "@/assets/Panache-OPAA.glb.asset.json";
+import sofaAsset from "@/assets/Panache-OPAA-80pct.glb.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
