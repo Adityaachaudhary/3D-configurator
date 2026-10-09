@@ -68,3 +68,6 @@
 ## Natural cushion folds
 - [x] Restrict dark lining to the hidden base underside and blend its boundary smoothly.
 - [x] Verify light fabrics and Chesterfield folds across seating sizes without changing padding or dimensions.
+## Client Wisdom fabric
+- [x] Replace Sage Weave with the uploaded Wisdom photograph in the sidebar and upholstery.
+- [ ] Verify the photo finish on all seating sizes, scale adjustment and unchanged legs.
