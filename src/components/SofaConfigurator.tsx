@@ -5,6 +5,7 @@ import {
   Line,
   OrbitControls,
   useGLTF,
+  useTexture,
 } from "@react-three/drei";
 import {
   Box,
@@ -30,12 +31,13 @@ import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 import sofaAsset from "@/assets/Panache-OPAA-80pct.glb.asset.json";
+import wisdomAsset from "@/assets/wisdom-fabric.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type FabricId = "oat" | "sage" | "clay" | "ink" | "pearl" | "moss" | "ocean-stripe" | "olive-check" | "rose-check" | "ochre-chevron" | "teal-diamond" | "graphite-stripe" | "cognac-leather" | "charcoal-leather" | "ivory-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
+type FabricId = "oat" | "wisdom" | "clay" | "ink" | "pearl" | "moss" | "ocean-stripe" | "olive-check" | "rose-check" | "ochre-chevron" | "teal-diamond" | "graphite-stripe" | "cognac-leather" | "charcoal-leather" | "ivory-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "stripe" | "check" | "chevron" | "diamond";
-type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; tufted?: boolean };
+type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; tufted?: boolean; photo?: string };
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
 type Unit = "cm" | "mm" | "in";
 type ViewName = "perspective" | "front" | "side" | "rear";
@@ -61,7 +63,7 @@ const BASE_SIZE = { width: seatingWidth(2), height: 32 * INCH_METERS, depth: 33 
 const FABRICS: FabricPreset[] = [
   { id: "oat", name: "Oat Bouclé", family: "Bouclé 04", color: "#b8aa91", weave: "loop" },
   { id: "pearl", name: "Pearl Linen", family: "Linen 01", color: "#d7d2c7", weave: "linen" },
-  { id: "sage", name: "Sage Weave", family: "Weave 12", color: "#788477", weave: "linen" },
+  { id: "wisdom", name: "Wisdom", family: "Client fabric", color: "", weave: "linen", photo: wisdomAsset.url },
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
   { id: "ink", name: "Ink Velvet", family: "Velvet 02", color: "#34383b", weave: "velvet" },
@@ -158,6 +160,51 @@ function createSurfaceMaps(kind: string) {
   return { map: make(colour, true), bumpMap: make(relief), roughnessMap: make(rough) };
 }
 
+// Mirror a square crop without stretching its threads. Opposing edges match,
+// avoiding hard photo borders across cushions and derived seating modules.
+function createPhotoSurfaceMaps(source: HTMLImageElement) {
+  const size = 1024;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return createSurfaceMaps("linen");
+  const crop = Math.min(source.naturalWidth, source.naturalHeight);
+  for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) {
+    ctx.save();
+    ctx.translate(x ? size : 0, y ? size : 0);
+    ctx.scale(x ? -1 : 1, y ? -1 : 1);
+    ctx.drawImage(source, (source.naturalWidth - crop) / 2, (source.naturalHeight - crop) / 2, crop, crop, 0, 0, size / 2, size / 2);
+    ctx.restore();
+  }
+  const pixels = ctx.getImageData(0, 0, size, size).data;
+  const relief = new Uint8Array(pixels.length);
+  const roughness = new Uint8Array(pixels.length);
+  for (let i = 0; i < pixels.length; i += 4) {
+    // Restrained photo-derived relief, not a second synthetic weave pattern.
+    const luminance = (pixels[i] ?? 0) * 0.2126 + (pixels[i + 1] ?? 0) * 0.7152 + (pixels[i + 2] ?? 0) * 0.0722;
+    const height = Math.round(THREE.MathUtils.clamp(128 + (luminance - 128) * 0.45, 0, 255));
+    for (let k = 0; k < 3; k++) {
+      relief[i + k] = height;
+      roughness[i + k] = Math.round(245 - height * 0.04);
+    }
+    relief[i + 3] = roughness[i + 3] = 255;
+  }
+  const configure = (texture: THREE.Texture, colorSpace: typeof THREE.SRGBColorSpace | typeof THREE.NoColorSpace) => {
+    texture.colorSpace = colorSpace;
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.generateMipmaps = true;
+    texture.needsUpdate = true;
+    return texture;
+  };
+  return {
+    map: configure(new THREE.CanvasTexture(canvas), THREE.SRGBColorSpace),
+    bumpMap: configure(new THREE.DataTexture(relief, size, size), THREE.NoColorSpace),
+    roughnessMap: configure(new THREE.DataTexture(roughness, size, size), THREE.NoColorSpace),
+  };
+}
+
 // The preview and upholstery share exactly the same seamless repeat artwork.
 function createPatternCanvas(fabric: FabricPreset) {
   const size = 1024;
@@ -202,7 +249,7 @@ function createPatternCanvas(fabric: FabricPreset) {
 function FabricSwatch({ fabric }: { fabric: FabricPreset }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    if (!canvas.current) return;
+    if (fabric.photo || !canvas.current) return;
     const ctx = canvas.current.getContext("2d");
     if (!ctx) return;
     if (fabric.pattern) {
@@ -224,7 +271,7 @@ function FabricSwatch({ fabric }: { fabric: FabricPreset }) {
       Object.values(maps).forEach((map) => map.dispose());
     }
   }, [fabric]);
-  return <span className="relative block h-9 w-full shrink-0 overflow-hidden rounded-[3px]"><canvas ref={canvas} width={192} height={192} aria-hidden="true" className="absolute inset-0 block h-full w-full" /></span>;
+  return <span className="relative block h-9 w-full shrink-0 overflow-hidden rounded-[3px]">{fabric.photo ? <img src={fabric.photo} alt="Wisdom fabric sample" className="absolute inset-0 block h-full w-full object-cover" /> : <canvas ref={canvas} width={192} height={192} aria-hidden="true" className="absolute inset-0 block h-full w-full" />}</span>;
 }
 
 // Restrict thread size to a believable range; printed repeat size remains independently adjustable.
@@ -818,6 +865,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   });
   const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
   const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
+  const wisdomPhoto = useTexture(wisdomAsset.url);
   const patternTexture = useMemo(() => {
     if (!selectedFabric.pattern) return null;
     const texture = new THREE.CanvasTexture(createPatternCanvas(selectedFabric));
@@ -830,8 +878,8 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   }, [selectedFabric]);
   useEffect(() => () => patternTexture?.dispose(), [patternTexture]);
   const fabricTexture = useMemo(
-    () => createSurfaceMaps(selectedFabric.weave),
-    [selectedFabric.weave],
+    () => selectedFabric.photo ? createPhotoSurfaceMaps(wisdomPhoto.image as HTMLImageElement) : createSurfaceMaps(selectedFabric.weave),
+    [selectedFabric.weave, selectedFabric.photo, wisdomPhoto],
   );
   const legTexture = useMemo(() => createSurfaceMaps(leg === "steel" ? "steel" : "wood"), [leg]);
   const tuftTexture = useMemo(() => selectedFabric.tufted ? createSurfaceMaps("tuft") : null, [selectedFabric.tufted]);
@@ -851,7 +899,8 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const colorCanvas = document.createElement("canvas");
     const colorContext = colorCanvas.getContext("2d");
     let fabricColor = new THREE.Color(selectedFabric.color || DEFAULT_FABRIC.color);
-    if (!selectedFabric.pattern && colorContext) {
+    if (selectedFabric.photo) fabricColor = new THREE.Color(1, 1, 1);
+    if (!selectedFabric.pattern && !selectedFabric.photo && colorContext) {
       colorContext.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(`--fabric-${selectedFabric.id}`).trim();
       colorContext.fillRect(0, 0, 1, 1);
       const rgb = colorContext.getImageData(0, 0, 1, 1).data;
