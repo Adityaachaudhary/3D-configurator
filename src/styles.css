@@ -82,9 +82,6 @@
   --pattern-ochre-chevron-base: oklch(0.91 0.02 92);
   --pattern-ochre-chevron-accent: oklch(0.66 0.11 85);
   --pattern-ochre-chevron-detail: oklch(0.4 0.018 90);
-  --pattern-teal-diamond-base: oklch(0.91 0.018 100);
-  --pattern-teal-diamond-accent: oklch(0.48 0.07 185);
-  --pattern-teal-diamond-detail: oklch(0.7 0.08 85);
   --pattern-graphite-stripe-base: oklch(0.88 0.004 240);
   --pattern-graphite-stripe-accent: oklch(0.33 0.012 240);
   --pattern-graphite-stripe-detail: oklch(0.62 0.02 230);

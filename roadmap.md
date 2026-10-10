@@ -83,3 +83,6 @@
 - [x] Reduce vertex relief and refine analytic seat/back/arm normal shading.
 - [x] Show centimeters per tile and break up Wisdom repeats without module seams.
 - [x] Test physical repeat conversion and verify finishes on all seating sizes.
+## Client Orange Pattern fabric
+- [x] Replace Teal Diamond with the uploaded Orange Pattern photograph in the sidebar and upholstery.
+- [x] Verify the photo finish on all seating sizes, tile adjustment and unchanged legs.
