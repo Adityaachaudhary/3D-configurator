@@ -233,12 +233,12 @@ Each frame, the whole assembly is scaled from the **real source bounds** so its 
 1. **Colour**: read `--fabric-<id>` by painting a 1×1 canvas and reading the pixel (converts oklch to RGB), interpreted as sRGB. Patterns use the fallback (white); photo = white.
 2. **Upholstery** = `MeshPhysicalMaterial`:
    - `...fabricTexture` (map, bumpMap, roughnessMap)
-    - `bumpScale`: tufted 0.024, tweed 0.0011, leather 0.0001, loop 0.00018, velvet 0.00004, other 0.00009
+    - `bumpScale` (three.js convention: ~0.5–3 reads as visible relief; 0 disables it): woven default 2, Oat 0.9, Clay 2.2, Forest 2, velvet 0, leather default 1 (Charcoal 0.8), pattern/photo fabrics 1, Swatch Urban 1.2, Chesterfields 0. `normalSoften` (flat-panel shading softening passed into `projectSurface`) is 0.15 woven, 0.35 velvet, 0.45 leather, 0.3 tufted.
     - `resolveLook(id, family, tufted)` merges family defaults with `OVERRIDES` from `material-looks.ts`; `applyLook` applies the result after constructing the material with its colour/maps. The old inline tweed override is removed.
-    - Solid sheen preserves base hue by multiplying linear base RGB by `sheenTint` (default 1.25, Ink Velvet 1.1), never lerping toward linear white. Photo/pattern white-base materials use an explicitly sRGB-decoded `sheenGrey` (Wisdom/Red Fish/Orange Pattern 0.2, Ochre Chevron 0.22, Swatch Urban 0.24). These starting tuning values prevent the old white/grey veil.
-    - Swatch Urban override keeps roughness 1, sheen 0.5, sheenRoughness 0.62 and bumpScale 0.0011. Oat/Forest retain loop relief 0.00018; ordinary leather starts at 0.0001 for its steeper cellular grain, while Chesterfield tuft relief remains unchanged.
-    - `upholstery.userData["baseColor"]` stores the untampered base colour. `applyLook` leaves maps and shader hooks alone; `projectSurface` is still installed afterwards. Live tuning: `useLookTuner(selectedFabric.id, look, whiteBase, [materials[0], chairMaterials[0]])` runs after `chairMaterials` in SofaModel, and `<DevPanel />` (leva, hidden outside DEV) is rendered once in SofaConfigurator.
-3. **Legs** = `MeshPhysicalMaterial`: leg colour, `...legTexture` (wood or steel maps), bumpScale steel 0.000008 / wood 0.000025, `...materialRecipe("steel" | "wood")`.
+    - Solid sheen lerps the base colour toward white by `sheenTint` (woven 0.12, velvet 0.14, Oat/Clay 0.15, Forest 0.2), so the fabric keeps its own hue; white-base photo/pattern materials use a flat `sheenGrey` (0.25 via `PATTERN`, Swatch Urban 0.4) applied with `setScalar`, so no white veil sits over dark fabrics.
+    - Swatch Urban keeps roughness 1, sheen 0.5, sheenRoughness 0.62, sheenGrey 0.4 and bumpScale 1.2. Oat's bouclé domes use bumpScale 0.9 with normalSoften 0.1; Forest Chenille keeps the woven 2; ordinary leather sits at 1 (Charcoal 0.8), and both Chesterfields set bumpScale 0 because their padding comes from the analytic tuft path instead.
+    - `upholstery.userData["baseColor"]` stores the untampered base colour and `userData["normalSoften"]` the look's shading softening. `applyLook` leaves maps and shader hooks alone; `projectSurface` is still installed afterwards, receiving `look.normalSoften` and `Boolean(selectedFabric.directional)` so flat panels can be softened and Orange Pattern's stripes stay vertical on the arms.
+3. **Legs** = `MeshPhysicalMaterial`: leg colour, `...legTexture` (wood or steel maps), bumpScale `LEG_BUMP.wood` 0.6 / `LEG_BUMP.steel` 0.2 (three.js convention), `...materialRecipe("steel" | "wood")`.
 4. **Underside lining colour** from `--fabric-underside`.
 5. `projectSurface(upholstery, tileDensity(cm), scale, patternTexture, tileDensity(cm), tufted, undersideColor, isPhoto)` and `projectSurface(legs, steel ? 3 : 1.6, scale)`.
 6. `chairMaterials` = clones of both with `projectSurface` re-applied (`onBeforeCompile` is not copied by `clone()`).
@@ -261,8 +261,9 @@ Base: metalness 0, sheen 0, sheenRoughness 0.5, clearcoat 0, clearcoatRoughness 
 
 | Function | Output |
 |---|---|
-| `createSurfaceMaps(kind)` | 256px, **512px for leather**, 2048px for `"tuft"`: seamless `DataTexture`s for `map` (neutral near-white, sRGB), `bumpMap` (height) and `roughnessMap` (linear data). Leather calls `leatherHeightField(size)` and uses `height = 0.15 + 0.7 * grain`, colour contrast 0.2, and roughness `0.78 + (1 - height) * 0.22` (creases rougher, dome tops smoother). Other kinds retain roughness `0.88 + height * 0.12`: wood (grain sines), steel (brushed lines), loop, velvet (fine noise), tuft (diamond), default linen/twill (warp/weft). Bytes are clamped to prevent overflow; neutral colour avoids multiplying the fabric colour twice. |
-| `leatherHeightField(size)` | Pure `Float32Array` generator: periodic jittered Voronoi sites, nearest/second-nearest distances forming rounded pebbles with steep narrow creases, per-cell height variation and restrained periodic pore noise. Forty cells across a tile gives approximately 3.125mm grain at the default 12.5cm tile. Shared grain drives colour, bump and roughness; no texture downloads or true normal/AO maps. All five leather finishes, including Chesterfields, use these 512px model maps; Chesterfield's 2048px diamond map remains swatch-only and model tufting remains analytic. |
+| `createSurfaceMaps(kind)` | 256px, **512px for leather**, 2048px for `"tuft"`: seamless `DataTexture`s for `map` (neutral near-white, sRGB), `bumpMap` (height) and `roughnessMap` (linear data). Leather calls `leatherHeightField(size)` and uses `height = 0.15 + 0.7 * grain`, colour contrast 0.2, and roughness `0.78 + (1 - height) * 0.22` (creases rougher, dome tops smoother). Bouclé calls `boucleHeightField(size)` with `height = grain` and colour contrast 0.35. Other kinds retain roughness `0.88 + height * 0.12`: wood (grain sines), steel (brushed lines), loop, velvet (fine noise), tuft (diamond), default linen/twill (warp/weft). Bytes are clamped to prevent overflow; neutral colour avoids multiplying the fabric colour twice. |
+| `leatherHeightField(size, cells = 40)` | Pure `Float32Array` generator: tileable Worley (cellular) grain — jittered sites per cell, nearest/second-nearest distance forming rounded pebbles with steep narrow creases, plus per-cell height variation. Forty cells across a tile gives approximately 3.1mm grain at the default 12.5cm tile. Shared grain drives colour, bump and roughness; no texture downloads or true normal/AO maps. All five leather finishes, including Chesterfields, use these 512px model maps; Chesterfield model tufting stays analytic and the 2048px diamond map is no longer generated. |
+| `boucleHeightField(size, cells = 14)` | Same file, same tileable Worley machinery: each cell is a rounded loop (1 at its centre, 0 in the gaps) with a random height per cell, so raised vs recessed is unambiguous — the old symmetric `sin × cos` "loop" height flipped with the lighting and read as reversed relief. Fourteen loops across a tile gives approximately 7mm loops at Oat's 10cm tile. Used by `createSurfaceMaps("boucle")`; Forest Chenille keeps the `loop` height. |
 | `createPhotoSurfaceMaps(img, cropPixels?, reliefStrength = 0.45)` | Central square crop of the photo drawn 4× mirrored into a 1024px canvas (seamless, no stretching). Red Fish uses a 128px source crop so its many tiny motifs remain visible at the default physical tile size; Wisdom, Swatch Urban and Orange Pattern use the largest square crop. bump = luminance scaled by `reliefStrength`; roughness inverse to height. When `reliefStrength > 0.6` (Swatch Urban tweed passes 1.1), a synthetic woven crosshatch is added on top of the photo relief: 48 rounded warp/weft yarns per tile with a broken-twill interlace and slub speckle, thread gaps darken the photo colour slightly, and roughness gaps stay flatter — so the weave reads as real threads, not a flat print. |
 | `createPatternCanvas(fabric)` | 1024px pattern from 3 token colours, with a faint 3 % thread modulation. check/chevron/diamond formulas. The stripe formula was removed with Ocean Stripe and Graphite Stripe; diamond has no remaining preset since Teal Diamond was replaced by Orange Pattern. |
 | `patternTexture` | `CanvasTexture` of that canvas (sRGB, repeat). |
@@ -270,7 +271,7 @@ Base: metalness 0, sheen 0, sheenRoughness 0.5, clearcoat 0, clearcoatRoughness 
 
 **Texture settings effect** (lines 902–914): colour maps & pattern → `SRGBColorSpace`; bump/roughness → `NoColorSpace`; `anisotropy = gl.capabilities.getMaxAnisotropy()`; mipmaps; `LinearMipmapLinearFilter` / `LinearFilter`.
 
-Leather's material roughness remains 0.58 from the physical family recipe; the height-dependent roughness **map multiplies** that value rather than replacing it. The tile slider controls the shared physical density on sofa modules and chair clones; the new grain does not alter geometry or tuft diamond size. Live tuning is installed: the leva panel (dev only) edits the active look via `useLookTuner`; press "copy JSON" and paste the result into `OVERRIDES` in `material-looks.ts` to make a tuning permanent.
+Leather's material roughness remains 0.55 from the `leather` family defaults; the height-dependent roughness **map multiplies** that value rather than replacing it. The tile slider controls the shared physical density on sofa modules and chair clones; the grain does not alter geometry or tuft diamond size. There is no live tuning panel: every look value is hardcoded in `OVERRIDES` / `DEFAULTS` in `material-looks.ts` — edit the numbers there and re-run the tests.
 
 ---
 
@@ -282,7 +283,7 @@ The GLB UVs are an atlas; cut/mirrored/stretched modules would show stretched an
 - `surfaceDensity = density / scale` (tiles per meter in world space; dividing by scale makes the pattern grow with the model, so each tile keeps the same size on the sofa)
 - `patternMap`, `patternDensity = patternRepeat / scale`
 - `undersideColor`
-- tuft: `tuftDensity = 4.5 / scale`, `tuftDepth = 0.0015 × scale`
+- tuft: `tuftDensity = 4.5 / scale`, `tuftDepth = RELIEF.recess × scale` (0.004 m)
 
 ### Vertex shader
 - Varyings: `surfacePosition` (world position), `surfaceNormal` (world normal), `surfaceFacingNormal` (world normal from the inverse-transpose normal matrix), `surfaceBaseHeight` (source-space `position.y`).
@@ -310,7 +311,7 @@ The GLB UVs are an atlas; cut/mirrored/stretched modules would show stretched an
   - roughness × `mix(1.22, 0.88, tuftShade)` (glossier crowns)
   - `normal_fragment_maps` is replaced in two stages: fine grain alone keeps screen-space derivatives at `grain × 0.00045 × scale`; tuft normals use central differences of the analytic profile, not derivatives of `tuftShade` across pixel quads.
   - `tuftPanelH(panel, p, detail, fp)` samples one panel profile. Dominant axis selection chooses seat (Y), back (Z) or arm (X), with panel-aligned world-space tangent vectors. Four samples at ±`0.003 × scale` metres yield the two partial derivatives, sharing the centre pixel's antialias footprint/detail.
-  - The gradient is divided by twice the probe distance, multiplied by `vTuftMask`, converted to view space, then scaled by `0.042 × scale` metres. Its component along the normal is removed before normalizing the perturbed result. Reduce 0.042 for flatter padding; increase the 3mm probe to suppress noise or decrease it for sharper pockets. These are JS template-literal values inside `projectSurface`.
+  - The gradient is divided by twice the probe distance, multiplied by `vTuftMask`, converted to view space, then scaled by `RELIEF.normalHeight × scale` metres (currently 0.085). Its component along the normal is removed before normalizing the perturbed result. Reduce `RELIEF.normalHeight` for flatter padding; increase the 3mm probe to suppress noise or decrease it for sharper pockets. These values live in `material-looks.ts` and are interpolated into the shader template inside `projectSurface`.
   - `surfaceRelief` = tuft height + 0.075 × grain, feeding three's bump code
 - Grain size follows the tile slider; diamond size does not (`tuftDensity` fixed 4.5/m).
 
@@ -376,7 +377,7 @@ bunx vitest run
 | Add a leg finish | `LegId`, `LEGS`, `--leg-<id>`, `.leg-swatch` rule |
 | Roughness / sheen / clearcoat | `src/lib/material-looks.ts` per-fabric overrides + tests; `material-recipes.ts` family defaults/legs |
 | Upholstery bump strength | `resolveLook` defaults / `OVERRIDES` in `src/lib/material-looks.ts` |
-| Leather pebble shape / density | `src/lib/leather-grain.ts`; map resolution, contrast and height-to-roughness in `createSurfaceMaps` |
+| Leather pebble / bouclé loop shape & density | `src/lib/leather-grain.ts` (`leatherHeightField`, `boucleHeightField`); map resolution, contrast and height-to-roughness in `createSurfaceMaps` |
 | Tile range | `src/lib/texture-repeat.ts` + its test |
 | Dimensions | `seatingWidth`, `BASE_SIZE` |
 | Lighting / exposure | `Viewer` |
