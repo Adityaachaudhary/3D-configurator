@@ -40,8 +40,8 @@ import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
-type FabricId = "oat" | "wisdom" | "clay" | "ink" | "pearl" | "moss" | "ocean-stripe" | "olive-check" | "red-fish" | "ochre-chevron" | "orange-pattern" | "graphite-stripe" | "cognac-leather" | "charcoal-leather" | "ivory-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
-type PatternKind = "stripe" | "check" | "chevron" | "diamond";
+type FabricId = "oat" | "wisdom" | "clay" | "ink" | "pearl" | "moss" | "olive-check" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "ivory-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
+type PatternKind = "check" | "chevron" | "diamond";
 type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; printed?: boolean; tufted?: boolean; photo?: string };
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
 type Unit = "cm" | "mm" | "in";
@@ -72,12 +72,10 @@ const FABRICS: FabricPreset[] = [
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
   { id: "ink", name: "Ink Velvet", family: "Velvet 02", color: "#34383b", weave: "velvet" },
-  { id: "ocean-stripe", name: "Ocean Stripe", family: "Stripe · Linen", color: "#ffffff", weave: "linen", pattern: "stripe" },
   { id: "olive-check", name: "Olive Check", family: "Check · Woven", color: "#ffffff", weave: "linen", pattern: "check" },
   { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "", weave: "linen", printed: true, photo: redFishAsset.url },
   { id: "ochre-chevron", name: "Ochre Chevron", family: "Chevron · Twill", color: "#ffffff", weave: "twill", pattern: "chevron" },
   { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "", weave: "twill", printed: true, photo: orangeAsset.url },
-  { id: "graphite-stripe", name: "Graphite Stripe", family: "Stripe · Linen", color: "#ffffff", weave: "linen", pattern: "stripe" },
   { id: "cognac-leather", name: "Cognac Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "charcoal-leather", name: "Charcoal Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "ivory-leather", name: "Ivory Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
@@ -227,7 +225,6 @@ function createPatternCanvas(fabric: FabricPreset) {
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const u = x / size, v = y / size;
     let color = 0;
-    if (fabric.pattern === "stripe") color = u < 0.42 ? 0 : u < 0.78 ? 1 : u < 0.84 ? 2 : 0;
     if (fabric.pattern === "check") {
       const a = u < 0.5, b = v < 0.5;
       color = a && b ? 1 : a || b ? 2 : 0;
