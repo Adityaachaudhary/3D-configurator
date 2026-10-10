@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
 import { applyLook, resolveLook, type UpholsteryFamily } from "@/lib/material-looks";
 import { leatherHeightField } from "@/lib/leather-grain";
+import { DevPanel, LightRig, useLookTuner } from "@/lib/dev-tuning";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
@@ -1147,13 +1148,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       onCreated={({ gl, camera }) => { gl.domElement.dataset["viewerCanvas"] = "true"; camera.layers.enable(1); }}
     >
       <color attach="background" args={[studio ? "#ebe9e4" : "#d9ded8"]} />
-      <ambientLight intensity={0.15} />
-      <directionalLight position={[-3, 6, 4]} intensity={0.6} />
-      <Environment resolution={256} environmentIntensity={1}>
-        <Lightformer form="rect" intensity={2.2} position={[-3, 5, 4]} target={[0, 0.4, 0]} scale={[7, 5, 1]} />
-        <Lightformer form="rect" intensity={1} position={[4, 2, 3]} target={[0, 0.4, 0]} scale={[6, 4, 1]} />
-        <Lightformer form="rect" intensity={0.85} position={[1, 4, -4]} target={[0, 0.4, 0]} scale={[5, 3, 1]} />
-      </Environment>
+      <LightRig />
       <mesh rotation-x={-Math.PI / 2} position-y={0} receiveShadow onUpdate={(floor) => floor.layers.set(1)}>
         <planeGeometry args={[30, 30]} />
         <meshStandardMaterial color={studio ? "#e3e0da" : "#ccd3cc"} roughness={0.96} />
