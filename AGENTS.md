@@ -27,6 +27,7 @@
 - Render floor grid lines after the opaque floor with depth testing enabled and depth writes disabled so the floor cannot erase them and the sofa still occludes them.
 - Smooth coincident upholstery shading normals without welding or moving geometry; leave leg normals intact because the source UV splits otherwise leave visible leather facets.
 - Restrict plain lining to the hidden base using undeformed source-space height below the base welt plus an inverse-transpose world-space facing normal and smooth masks; downward cushion folds keep upholstery because orientation alone misclassifies visible creases.
-- Use 2048px tuft preview maps; antialias analytic model tufting with fragment pixel footprints, keeping vertex relief derivative-free for stable depth and joins.
+- Use leather swatch maps for Chesterfield; keep analytic tuft antialiasing and derivative-free vertex relief.
+- Share dimensions and studio floor lift in `sofa-spec.ts` to keep transforms and measurements consistent.
 - Optimize the sofa offline with the reproducible `scripts/optimize-sofa.mjs` Meshoptimizer pass and a separate asset pointer; retain the original, lock triangles crossing module cut bands plus legs/base and silhouette extremes, and use normal-weighted simplification with a strict error budget to preserve curves without runtime simplification.
 - Strip TanStack devtools `data-tsd-source` tags from the 3D scene module via a post-transform Vite plugin, because R3F treats dashed props as nested object paths and crashes when they change on reload.
