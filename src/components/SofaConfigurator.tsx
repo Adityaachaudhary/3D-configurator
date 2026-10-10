@@ -34,13 +34,14 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import sofaAsset from "@/assets/Panache-OPAA-80pct.glb.asset.json";
 import wisdomAsset from "@/assets/wisdom-fabric.png.asset.json";
 import redFishAsset from "@/assets/red-fish-fabric.png.asset.json";
+import swatchUrbanAsset from "@/assets/swatch-urban-fabric.png.asset.json";
 import orangeAsset from "@/assets/orange-pattern-fabric.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
-type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "olive-check" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
+type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "check" | "chevron" | "diamond";
 type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; printed?: boolean; tufted?: boolean; photo?: string };
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
@@ -71,7 +72,7 @@ const FABRICS: FabricPreset[] = [
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
   { id: "ink", name: "Ink Velvet", family: "Velvet 02", color: "#34383b", weave: "velvet" },
-  { id: "olive-check", name: "Olive Check", family: "Check · Woven", color: "#ffffff", weave: "linen", pattern: "check" },
+  { id: "swatch-urban", name: "Swatch Urban", family: "Client fabric · Textured tweed", color: "", weave: "tweed", printed: true, photo: swatchUrbanAsset.url },
   { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "", weave: "linen", printed: true, photo: redFishAsset.url },
   { id: "ochre-chevron", name: "Ochre Chevron", family: "Chevron · Twill", color: "#ffffff", weave: "twill", pattern: "chevron" },
   { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "", weave: "twill", printed: true, photo: orangeAsset.url },
@@ -163,7 +164,7 @@ function createSurfaceMaps(kind: string) {
 
 // Mirror a square crop without stretching its threads. Opposing edges match,
 // avoiding hard photo borders across cushions and derived seating modules.
-function createPhotoSurfaceMaps(source: HTMLImageElement, cropPixels?: number) {
+function createPhotoSurfaceMaps(source: HTMLImageElement, cropPixels?: number, reliefStrength = 0.45) {
   const size = 1024;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
@@ -183,10 +184,11 @@ function createPhotoSurfaceMaps(source: HTMLImageElement, cropPixels?: number) {
   for (let i = 0; i < pixels.length; i += 4) {
     // Restrained photo-derived relief, not a second synthetic weave pattern.
     const luminance = (pixels[i] ?? 0) * 0.2126 + (pixels[i + 1] ?? 0) * 0.7152 + (pixels[i + 2] ?? 0) * 0.0722;
-    const height = Math.round(THREE.MathUtils.clamp(128 + (luminance - 128) * 0.45, 0, 255));
+    const height = Math.round(THREE.MathUtils.clamp(128 + (luminance - 128) * reliefStrength, 0, 255));
     for (let k = 0; k < 3; k++) {
       relief[i + k] = height;
-      roughness[i + k] = Math.round(245 - height * 0.04);
+      // Raised slub yarns catch light slightly; recessed gaps stay fully matte.
+      roughness[i + k] = Math.round(THREE.MathUtils.clamp(reliefStrength > 0.6 ? 255 - height * 0.12 : 245 - height * 0.04, 0, 255));
     }
     relief[i + 3] = roughness[i + 3] = 255;
   }
@@ -890,7 +892,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   }, [selectedFabric]);
   useEffect(() => () => patternTexture?.dispose(), [patternTexture]);
   const fabricTexture = useMemo(
-    () => selectedFabric.photo ? createPhotoSurfaceMaps(fabricPhoto.image as HTMLImageElement, selectedFabric.id === "red-fish" ? 128 : undefined) : createSurfaceMaps(selectedFabric.weave),
+    () => selectedFabric.photo ? createPhotoSurfaceMaps(fabricPhoto.image as HTMLImageElement, selectedFabric.id === "red-fish" ? 128 : undefined, selectedFabric.weave === "tweed" ? 1.1 : 0.45) : createSurfaceMaps(selectedFabric.weave),
     [selectedFabric.id, selectedFabric.weave, selectedFabric.photo, fabricPhoto],
   );
   const legTexture = useMemo(() => createSurfaceMaps(leg === "steel" ? "steel" : "wood"), [leg]);
@@ -924,9 +926,10 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const upholstery = new THREE.MeshPhysicalMaterial({
       color: fabricColor,
       ...fabricTexture,
-      bumpScale: selectedFabric.tufted ? 0.024 : leather ? 0.00045 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
+      bumpScale: selectedFabric.tufted ? 0.024 : leather ? 0.00045 : selectedFabric.weave === "tweed" ? 0.0006 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
       ...materialRecipe(leather ? "leather" : selectedFabric.weave === "velvet" ? "velvet" : "woven", selectedFabric.tufted),
       sheenColor: fabricColor.clone().lerp(new THREE.Color(1, 1, 1), 0.35),
+      ...(selectedFabric.weave === "tweed" ? { roughness: 1, sheen: 0.35, sheenRoughness: 0.7, sheenColor: new THREE.Color(0.62, 0.58, 0.52) } : {}),
     });
     const feet = new THREE.MeshPhysicalMaterial({
       color: selectedLeg.color,
