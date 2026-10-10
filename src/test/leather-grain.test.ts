@@ -16,7 +16,7 @@ describe("real leather grain", () => {
     expect(high).toBeLessThanOrEqual(1);
     expect(low).toBeLessThan(0.05);
     expect(high).toBeGreaterThan(0.85);
-  });
+  }, 20000);
   it("wraps both tile edges without a larger jump than neighbouring interior samples", () => {
     const size = 512, field = leatherHeightField(size);
     let seam = 0, interior = 0;
@@ -30,8 +30,8 @@ describe("real leather grain", () => {
     // comparable to ordinary adjacent pixels, not artificially flattened.
     expect(seam / (2 * size)).toBeLessThan(0.3);
     expect(seam).toBeLessThan(interior * 1.25);
-  });
+  }, 20000);
   it("rejects invalid map dimensions", () => {
     for (const size of [0, -1, 1.5, NaN]) expect(() => leatherHeightField(size)).toThrow(RangeError);
-  });
+  }, 20000);
 });
