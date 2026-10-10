@@ -39,6 +39,7 @@ import { boucleHeightField, leatherHeightField } from "@/lib/leather-grain";
 import { seatingWidth, BASE_SIZE, FLOOR_LIFT } from "@/lib/sofa-spec";
 import { LightRig } from "@/lib/static-light-rig";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
+import { PRICE_PER_SEAT, PRICE_PER_LEG_FINISH, fabricPrice, totalPrice, formatINR } from "@/lib/pricing";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "check" | "chevron" | "diamond";
@@ -1254,6 +1255,8 @@ export function SofaConfigurator() {
   };
   const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
   const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
+  const fabricRate = fabricPrice(selectedFabric);
+  const price = totalPrice(seats, selectedFabric);
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
@@ -1350,7 +1353,19 @@ export function SofaConfigurator() {
           </section>
         </div>
       </aside>
-      <div className="pointer-events-none absolute bottom-20 left-3 hidden items-center gap-2 rounded-md bg-surface/85 px-3 py-2 text-[10px] font-medium text-muted-foreground shadow-sm lg:flex"><Maximize2 className="size-3" /> Drag to orbit · scroll or pinch to zoom · right-drag to pan</div>
+      <section aria-label="Price" className="absolute bottom-5 left-3 z-20 w-44 rounded-md border border-border/60 bg-surface p-3 shadow-panel sm:left-5">
+        <h2 className="font-display text-[11px] font-semibold uppercase text-muted-foreground">Price</h2>
+        <dl className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+          <div className="flex items-center justify-between"><dt>{seats} seater</dt><dd className="font-mono">{formatINR(seats * PRICE_PER_SEAT)}</dd></div>
+          <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedFabric.name}</dt><dd className="font-mono">{formatINR(fabricRate)}</dd></div>
+          <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedLeg.name}</dt><dd className="font-mono">{formatINR(PRICE_PER_LEG_FINISH)}</dd></div>
+        </dl>
+        <div className="mt-2 flex items-baseline justify-between border-t border-border/60 pt-2">
+          <span className="text-[11px] font-medium">Total</span>
+          <span className="font-display text-lg font-semibold">{formatINR(price)}</span>
+        </div>
+      </section>
+      <div className="pointer-events-none absolute bottom-52 left-3 hidden items-center gap-2 rounded-md bg-surface/85 px-3 py-2 text-[10px] font-medium text-muted-foreground shadow-sm lg:flex"><Maximize2 className="size-3" /> Drag to orbit · scroll or pinch to zoom · right-drag to pan</div>
     </main>
   );
 }
