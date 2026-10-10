@@ -113,3 +113,9 @@
 - [x] Remove live tuning and reset controls, replace lighting with a static rig and remove leva.
 - [x] Apply weave contrast, directional photo mapping, preset tile selection and preset-driven shader settings; retain existing tile/relief values and zero softening where no new numbers were supplied.
 - [x] Verify material tests and the live viewer across seating variants.
+
+## Sofa specification and texture patch
+- [x] Share existing dimensions and floor lift via sofa-spec.ts.
+- [x] Use leather swatch maps for Chesterfield and add the supplied development scale audit.
+- [ ] Apply bouclé, leather tile minimum and leg bump presets; blocked on user-supplied leather-grain.ts and material-looks.ts.
+- [x] Verify Oat, Cognac and Oxblood in the viewer; all render with no browser errors and build OK.

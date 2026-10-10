@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
 import { applyLook, resolveLook, tileFor, LIGHTING, RELIEF } from "@/lib/material-looks";
 import { leatherHeightField } from "@/lib/leather-grain";
+import { seatingWidth, BASE_SIZE, FLOOR_LIFT } from "@/lib/sofa-spec";
 import { LightRig } from "@/lib/static-light-rig";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
@@ -62,10 +63,6 @@ function useReducedMotion() {
 }
 
 const MODULE_WIDTH = 0.7;
-// The chart specifies exact inches; its millimeter equivalents are rounded.
-const INCH_METERS = 0.0254;
-const seatingWidth = (seats: number) => (34 + (seats - 1) * 24) * INCH_METERS;
-const BASE_SIZE = { width: seatingWidth(2), height: 32 * INCH_METERS, depth: 33 * INCH_METERS };
 const FABRICS: FabricPreset[] = [
   { id: "oat", name: "Oat Bouclé", family: "Bouclé 04", color: "#b8aa91", weave: "loop" },
   { id: "wisdom", name: "Wisdom", family: "Client fabric", color: "", weave: "linen", photo: wisdomAsset.url },
@@ -278,7 +275,7 @@ function FabricSwatch({ fabric }: { fabric: FabricPreset }) {
       const artwork = createPatternCanvas(fabric);
       for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) ctx.drawImage(artwork, x * 64, y * 64, 64, 64);
     } else {
-      const maps = createSurfaceMaps(fabric.tufted ? "tuft" : fabric.weave);
+      const maps = createSurfaceMaps(fabric.tufted ? "leather" : fabric.weave);
       const data = maps.map.image.data;
       const w = maps.map.image.width;
       const image = ctx.createImageData(192, 192);
@@ -833,6 +830,23 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     geometry.computeBoundingBox();
     return geometry.boundingBox?.clone() ?? null;
   }, [geometry]);
+  useEffect(() => {
+    if (!import.meta.env.DEV || !sourceBounds || seats !== 2 || scale !== 1) return;
+    const timer = window.setTimeout(() => {
+      if (!assembly.current) return;
+      const size = new THREE.Box3().setFromObject(assembly.current).getSize(new THREE.Vector3());
+      const src = sourceBounds.getSize(new THREE.Vector3());
+      const f = [BASE_SIZE.width / src.x, BASE_SIZE.height / src.y, BASE_SIZE.depth / src.z];
+      console.info("[scale audit]", {
+        widthCm: +(size.x * 100).toFixed(1),
+        heightCm: +(size.y * 100).toFixed(1),
+        depthCm: +(size.z * 100).toFixed(1),
+        stretchFactors: f.map((v) => +v.toFixed(4)),
+        stretchSpreadPct: +(((Math.max(...f) - Math.min(...f)) / Math.min(...f)) * 100).toFixed(1),
+      });
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [sourceBounds, seats, scale]);
   const modules = useMemo(() => geometry ? [
     sliceModule(geometry, -Infinity, -MODULE_WIDTH),
     sliceModule(geometry, MODULE_WIDTH, Infinity),
@@ -893,7 +907,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const sy = BASE_SIZE.height / sourceSize.y * scale;
     const sz = BASE_SIZE.depth / sourceSize.z * scale;
     assembly.current.scale.set(sx, sy, sz);
-    assembly.current.position.set(-sourceCenter.x * sx, 0.015 - sourceBounds.min.y * sy, -sourceCenter.z * sz);
+    assembly.current.position.set(-sourceCenter.x * sx, FLOOR_LIFT.studio - sourceBounds.min.y * sy, -sourceCenter.z * sz);
     assembly.current.visible = chairBlend < 0.999;
     if (chair.current) {
       chair.current.visible = chairBlend > 0.001;
@@ -904,7 +918,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       const chairSy = BASE_SIZE.height / chairSize.y * scale * reveal;
       const chairSz = BASE_SIZE.depth / chairSize.z * scale * reveal;
       chair.current.scale.set(seatingWidth(1) / chairWidth * scale * reveal, chairSy, chairSz);
-      chair.current.position.set(0, 0.015 - chairBounds.min.y * chairSy, -chairCenter.z * chairSz);
+      chair.current.position.set(0, FLOOR_LIFT.studio - chairBounds.min.y * chairSy, -chairCenter.z * chairSz);
     }
     for (const material of materials) {
       material.opacity = 1 - chairBlend;
