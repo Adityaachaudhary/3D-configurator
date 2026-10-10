@@ -39,6 +39,7 @@ import orangeAsset from "@/assets/orange-pattern-fabric.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
+import { applyLook, resolveLook, type UpholsteryFamily } from "@/lib/material-looks";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
@@ -898,6 +899,9 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   });
   const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
   const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
+  const leather = selectedFabric.weave === "leather";
+  const family: UpholsteryFamily = leather ? "leather" : selectedFabric.weave === "velvet" ? "velvet" : "woven";
+  const whiteBase = Boolean(selectedFabric.pattern || selectedFabric.photo);
   const fabricPhoto = useTexture(selectedFabric.photo ?? wisdomAsset.url);
   const patternTexture = useMemo(() => {
     if (!selectedFabric.pattern) return null;
@@ -931,7 +935,6 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     }
   }, [gl, fabricTexture, legTexture, patternTexture]);
   const materials = useMemo(() => {
-    const leather = selectedFabric.weave === "leather";
     const colorCanvas = document.createElement("canvas");
     const colorContext = colorCanvas.getContext("2d");
     let fabricColor = new THREE.Color(selectedFabric.color || DEFAULT_FABRIC.color);
@@ -942,14 +945,10 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       const rgb = colorContext.getImageData(0, 0, 1, 1).data;
       fabricColor = new THREE.Color().setRGB((rgb[0] ?? 0) / 255, (rgb[1] ?? 0) / 255, (rgb[2] ?? 0) / 255, THREE.SRGBColorSpace);
     }
-    const upholstery = new THREE.MeshPhysicalMaterial({
-      color: fabricColor,
-      ...fabricTexture,
-      bumpScale: selectedFabric.tufted ? 0.024 : leather ? 0.00045 : selectedFabric.weave === "tweed" ? 0.0011 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
-      ...materialRecipe(leather ? "leather" : selectedFabric.weave === "velvet" ? "velvet" : "woven", selectedFabric.tufted),
-      sheenColor: fabricColor.clone().lerp(new THREE.Color(1, 1, 1), 0.35),
-      ...(selectedFabric.weave === "tweed" ? { roughness: 1, sheen: 0.5, sheenRoughness: 0.62, sheenColor: new THREE.Color(0.66, 0.62, 0.56) } : {}),
-    });
+    const look = resolveLook(selectedFabric.id, family, Boolean(selectedFabric.tufted));
+    const upholstery = new THREE.MeshPhysicalMaterial({ color: fabricColor, ...fabricTexture });
+    applyLook(upholstery, look, fabricColor, whiteBase);
+    upholstery.userData["baseColor"] = fabricColor;
     const feet = new THREE.MeshPhysicalMaterial({
       color: selectedLeg.color,
       ...legTexture,
@@ -968,7 +967,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     projectSurface(upholstery, leather ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale), scale, patternTexture, tileDensity(textureScale), selectedFabric.tufted ?? false, undersideColor, Boolean(selectedFabric.photo));
     projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
-  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture]);
+  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture, leather, family, whiteBase]);
   const chairMaterials = useMemo(() => materials.map((material, i) => {
     const clone = material.clone();
     const lining = material.userData["undersideColor"];
