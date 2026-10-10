@@ -970,7 +970,6 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       const rgb = colorContext.getImageData(0, 0, 1, 1).data;
       fabricColor = new THREE.Color().setRGB((rgb[0] ?? 0) / 255, (rgb[1] ?? 0) / 255, (rgb[2] ?? 0) / 255, THREE.SRGBColorSpace);
     }
-    const look = resolveLook(selectedFabric.id, family, Boolean(selectedFabric.tufted));
     const upholstery = new THREE.MeshPhysicalMaterial({ color: fabricColor, ...fabricTexture });
     applyLook(upholstery, look, fabricColor, whiteBase);
     upholstery.userData["baseColor"] = fabricColor;
