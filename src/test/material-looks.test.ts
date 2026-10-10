@@ -1,35 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { Color, MeshPhysicalMaterial, SRGBColorSpace } from "three";
+import { Color, MeshPhysicalMaterial } from "three";
 import { applyLook, resolveLook } from "../lib/material-looks";
 
 describe("per-fabric material looks", () => {
-  it("keeps Ink Velvet sheen base-tinted without mixing in linear white", () => {
+  it("keeps Ink Velvet sheen nearly base-coloured with only a small linear lerp toward white", () => {
     const base = new Color("#34383b");
     const material = new MeshPhysicalMaterial();
-    applyLook(material, resolveLook("ink", "velvet"), base, false);
-    expect(material.sheenColor.r).toBeCloseTo(base.r * 1.1);
-    expect(material.sheenColor.g).toBeCloseTo(base.g * 1.1);
-    expect(material.sheenColor.b).toBeCloseTo(base.b * 1.1);
-    expect(material.sheenColor.r).toBeLessThan(0.05);
+    const look = resolveLook("ink", "velvet");
+    applyLook(material, look, base, false);
+    expect(look.sheenTint).toBe(0.04);
+    expect(material.sheenColor.r).toBeCloseTo(base.r + (1 - base.r) * 0.04);
+    expect(material.sheenColor.r).toBeLessThan(0.1);
     expect(base.getHexString()).toBe("34383b");
     material.dispose();
   });
-  it("uses calibrated sRGB grey rather than white sheen for photos and patterns", () => {
+  it("uses a linear grey sheen for white-base photo and pattern fabrics", () => {
     for (const id of ["wisdom", "red-fish", "orange-pattern", "ochre-chevron", "swatch-urban"]) {
       const look = resolveLook(id, "woven");
       const material = new MeshPhysicalMaterial();
       applyLook(material, look, new Color(1, 1, 1), true);
-      expect(material.sheenColor.equals(new Color().setRGB(look.sheenGrey, look.sheenGrey, look.sheenGrey, SRGBColorSpace))).toBe(true);
-      expect(material.sheenColor.r).toBeLessThan(0.05);
+      expect(material.sheenColor.r).toBeCloseTo(look.sheenGrey);
+      expect(material.sheenColor.g).toBeCloseTo(look.sheenGrey);
+      expect(material.sheenColor.b).toBeCloseTo(look.sheenGrey);
       material.dispose();
     }
   });
-  it("moves Swatch Urban's tweed recipe to its per-fabric override", () => {
+  it("keeps Swatch Urban's tweed recipe in its per-fabric override", () => {
     const look = resolveLook("swatch-urban", "woven");
     expect(look.roughness).toBe(1);
     expect(look.sheen).toBe(0.5);
     expect(look.sheenRoughness).toBe(0.62);
     expect(look.bumpScale).toBe(0.0011);
+    expect(look.sheenGrey).toBe(0.4);
   });
   it("starts steeper ordinary leather grain at 0.0001 bump depth", () => {
     for (const id of ["cognac-leather", "charcoal-leather", "olive-leather"]) {
