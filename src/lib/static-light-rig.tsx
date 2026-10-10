@@ -1,17 +1,28 @@
-import { Environment, Lightformer } from "@react-three/drei";
-import { createElement, Fragment } from "react";
-import { LIGHTING } from "./material-looks";
+// Hardcoded studio lighting. No leva, no sliders. Edit the numbers in LIGHTING
+// (material-looks.ts). Put <LightRig /> in the Canvas where the old ambientLight /
+// directionalLight / <Environment> block was.
+//
+// Also in the Canvas gl props use:
+//   toneMapping: THREE.NeutralToneMapping,
+//   toneMappingExposure: LIGHTING.exposure,
 
-// createElement keeps devtools JSX source tags off Three.js objects.
+import { Environment, Lightformer } from "@react-three/drei";
+
+import { LIGHTING as L } from "./material-looks";
+
+const TARGET: [number, number, number] = [0, 0.4, 0];
+
 export function LightRig() {
-  return createElement(Fragment, null,
-    createElement("ambientLight", { intensity: LIGHTING.ambient }),
-    createElement("directionalLight", LIGHTING.directional),
-    createElement(Environment, { resolution: 256, environmentIntensity: LIGHTING.environmentIntensity, frames: 1 },
-      createElement("color", { attach: "background", args: [LIGHTING.envBase, LIGHTING.envBase, LIGHTING.envBase] }),
-      createElement(Lightformer, { form: "rect", ...LIGHTING.key, target: [0, 0.4, 0] }),
-      createElement(Lightformer, { form: "rect", ...LIGHTING.fill, target: [0, 0.4, 0] }),
-      createElement(Lightformer, { form: "rect", ...LIGHTING.rim, target: [0, 0.4, 0] }),
-    ),
+  return (
+    <>
+      <ambientLight intensity={L.ambient} />
+      <directionalLight position={L.directional.position} intensity={L.directional.intensity} />
+      <Environment resolution={256} environmentIntensity={L.environmentIntensity}>
+        <color attach="background" args={[L.envBase, L.envBase, L.envBase]} />
+        <Lightformer form="rect" intensity={L.key.intensity} position={L.key.position} target={TARGET} scale={L.key.scale} />
+        <Lightformer form="rect" intensity={L.fill.intensity} position={L.fill.position} target={TARGET} scale={L.fill.scale} />
+        <Lightformer form="rect" intensity={L.rim.intensity} position={L.rim.position} target={TARGET} scale={L.rim.scale} />
+      </Environment>
+    </>
   );
 }

@@ -350,7 +350,7 @@ bun scripts/optimize-sofa.mjs input.glb output.glb report.json
 ## 16. Gotchas and known leftovers
 
 - **Client-only**: `index.tsx` uses `ssr: false`; WebGL can't render on the server.
-- **`data-tsd-source` crash**: TanStack devtools inject this prop on JSX; R3F treats dashed props as nested paths and crashes on reload. `vite.config.ts` strips it from modules whose id contains `SofaConfigurator` — keep scene JSX in that file.
+- **`data-tsd-source` crash**: TanStack devtools inject this prop on JSX; R3F treats dashed props as nested paths and crashes on reload. `vite.config.ts` strips it from modules whose id contains `SofaConfigurator` or `static-light-rig` — add any new scene-JSX module to that marker list.
 - `material.clone()` drops `onBeforeCompile`; always call `projectSurface` again on clones.
 - Bump the shader cache key when changing shader strings.
 - Don't select parts by GLB material name (only one exists) and don't use mesh UVs for fabric.
