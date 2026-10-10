@@ -89,3 +89,6 @@
 ## Remove unused stripe fabrics
 - [x] Delete Ocean Stripe and Graphite Stripe, their colour tokens and the unused stripe generator.
 - [x] Verify the remaining sixteen fabrics and that the sofa still renders on all seating sizes.
+## Remove Pearl Linen and Ivory Leather
+- [x] Delete both finishes, their colour tokens and swatch rule; update the architecture guide.
+- [x] Verify the remaining fourteen fabrics and that the sofa still renders with them.
