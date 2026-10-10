@@ -1353,7 +1353,7 @@ export function SofaConfigurator() {
           </section>
         </div>
       </aside>
-      <section aria-label="Price" className="absolute bottom-5 left-3 z-20 w-44 rounded-md border border-border/60 bg-surface p-3 shadow-panel sm:left-5">
+      <section aria-label="Price" className="absolute bottom-5 right-3 z-20 w-44 rounded-md border border-border/60 bg-surface p-3 shadow-panel sm:right-[calc(var(--panel-width)+1.25rem)]">
         <h2 className="font-display text-[11px] font-semibold uppercase text-muted-foreground">Price</h2>
         <dl className="mt-2 space-y-1 text-[11px] text-muted-foreground">
           <div className="flex items-center justify-between"><dt>{seats} seater</dt><dd className="font-mono">{formatINR(seats * PRICE_PER_SEAT)}</dd></div>
@@ -1365,7 +1365,7 @@ export function SofaConfigurator() {
           <span className="font-display text-lg font-semibold">{formatINR(price)}</span>
         </div>
       </section>
-      <div className="pointer-events-none absolute bottom-52 left-3 hidden items-center gap-2 rounded-md bg-surface/85 px-3 py-2 text-[10px] font-medium text-muted-foreground shadow-sm lg:flex"><Maximize2 className="size-3" /> Drag to orbit · scroll or pinch to zoom · right-drag to pan</div>
+      <div className="pointer-events-none absolute bottom-5 left-3 hidden items-center gap-2 rounded-md bg-surface/85 px-3 py-2 text-[10px] font-medium text-muted-foreground shadow-sm lg:flex"><Maximize2 className="size-3" /> Drag to orbit · scroll or pinch to zoom · right-drag to pan</div>
     </main>
   );
 }
