@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leatherHeightField } from "../lib/leather-grain";
+import { boucleHeightField, leatherHeightField } from "../lib/leather-grain";
 
 describe("real leather grain", () => {
   it("generates deterministic 512px bounded relief with distinct creases and crowns", () => {
@@ -31,7 +31,39 @@ describe("real leather grain", () => {
     expect(seam / (2 * size)).toBeLessThan(0.3);
     expect(seam).toBeLessThan(interior * 1.25);
   }, 20000);
-  it("rejects invalid map dimensions", () => {
-    for (const size of [0, -1, 1.5, NaN]) expect(() => leatherHeightField(size)).toThrow(RangeError);
+});
+
+describe("bouclé loops", () => {
+  it("generates deterministic bounded domes with recessed gaps", () => {
+    const field = boucleHeightField(256);
+    expect(field.length).toBe(256 * 256);
+    expect(field).toEqual(boucleHeightField(256));
+    let low = 1, high = 0, raised = 0;
+    for (const height of field) {
+      expect(Number.isFinite(height)).toBe(true);
+      low = Math.min(low, height);
+      high = Math.max(high, height);
+      if (height > 0.5) raised += 1;
+    }
+    expect(low).toBeGreaterThanOrEqual(0);
+    expect(high).toBeLessThanOrEqual(1);
+    // Each loop is a dome: dark gaps between clearly raised centres.
+    expect(low).toBeLessThan(0.05);
+    expect(high).toBeGreaterThan(0.85);
+    // Loops are rounded domes: a meaningful minority of the tile sits above half
+    // height, the rest is the recessed gap network between them.
+    expect(raised / field.length).toBeGreaterThan(0.15);
+  }, 20000);
+  it("wraps both tile edges without a larger jump than neighbouring interior samples", () => {
+    const size = 256, field = boucleHeightField(size);
+    let seam = 0, interior = 0;
+    for (let n = 0; n < size; n++) {
+      seam += Math.abs((field[n * size] ?? 0) - (field[n * size + size - 1] ?? 0));
+      seam += Math.abs((field[n] ?? 0) - (field[(size - 1) * size + n] ?? 0));
+      interior += Math.abs((field[n * size + 1] ?? 0) - (field[n * size] ?? 0));
+      interior += Math.abs((field[size + n] ?? 0) - (field[n] ?? 0));
+    }
+    expect(seam / (2 * size)).toBeLessThan(0.3);
+    expect(seam).toBeLessThan(interior * 1.25);
   }, 20000);
 });

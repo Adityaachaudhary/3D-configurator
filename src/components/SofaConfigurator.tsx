@@ -36,8 +36,8 @@ import orangeAsset from "@/assets/orange-pattern-fabric.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
-import { applyLook, resolveLook, tileFor, LIGHTING, RELIEF } from "@/lib/material-looks";
-import { leatherHeightField } from "@/lib/leather-grain";
+import { applyLook, resolveLook, tileFor, LIGHTING, RELIEF, MIN_LEATHER_TILE_CM, LEG_BUMP } from "@/lib/material-looks";
+import { boucleHeightField, leatherHeightField } from "@/lib/leather-grain";
 import { seatingWidth, BASE_SIZE, FLOOR_LIFT } from "@/lib/sofa-spec";
 import { LightRig } from "@/lib/static-light-rig";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
@@ -64,7 +64,7 @@ function useReducedMotion() {
 
 const MODULE_WIDTH = 0.7;
 const FABRICS: FabricPreset[] = [
-  { id: "oat", name: "Oat Bouclé", family: "Bouclé 04", color: "#b8aa91", weave: "loop" },
+  { id: "oat", name: "Oat Bouclé", family: "Bouclé 04", color: "#b8aa91", weave: "boucle" },
   { id: "wisdom", name: "Wisdom", family: "Client fabric", color: "", weave: "linen", photo: wisdomAsset.url },
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
@@ -104,6 +104,7 @@ function formatDimension(meters: number, unit: Unit) {
 function createSurfaceMaps(kind: string) {
   const size = kind === "tuft" ? 2048 : kind === "leather" ? 512 : 256;
   const grain = kind === "leather" ? leatherHeightField(size) : null;
+  const grainB = kind === "boucle" ? boucleHeightField(size) : null;
   const colour = new Uint8Array(size * size * 4);
   const relief = new Uint8Array(size * size * 4);
   const rough = new Uint8Array(size * size * 4);
@@ -116,6 +117,7 @@ function createSurfaceMaps(kind: string) {
       if (kind === "wood") height = 0.5 + 0.28 * Math.sin(u * 18 + 1.6 * Math.sin(v * 2) + 0.5 * Math.sin(v * 5)) + noise * 0.06;
       else if (kind === "steel") height = 0.5 + 0.2 * Math.sin(u * 95) + noise * 0.05;
       else if (kind === "loop") height = 0.5 + 0.23 * Math.sin(u * 9 + Math.sin(v * 11)) * Math.cos(v * 11 + Math.sin(u * 9)) + noise * 0.1;
+      else if (kind === "boucle") height = grainB?.[y * size + x] ?? 0.5;
       else if (kind === "velvet") height = 0.5 + noise * 0.12;
       else if (kind === "leather") height = 0.15 + 0.7 * (grain?.[y * size + x] ?? 0.5);
       else if (kind === "tuft") {
@@ -135,7 +137,7 @@ function createSurfaceMaps(kind: string) {
         height = 0.5 + 0.22 * (over > 0 ? warp : weft) + noise * 0.06;
       }
       const i = (y * size + x) * 4;
-      const contrast = kind === "wood" ? 0.3 : kind === "steel" ? 0.1 : kind === "leather" ? 0.2 : kind === "velvet" ? 0.045 : kind === "loop" ? 0.5 : 0.32;
+      const contrast = kind === "wood" ? 0.3 : kind === "steel" ? 0.1 : kind === "leather" ? 0.2 : kind === "velvet" ? 0.045 : kind === "boucle" ? 0.35 : kind === "loop" ? 0.5 : 0.32;
       // Clamp: Uint8Array wraps out-of-range values, which turned wood grain crests black.
       const value = Math.round(255 * THREE.MathUtils.clamp(kind === "tuft" ? 0.72 + height * 0.28 : 0.94 + (height - 0.5) * contrast, 0, 1));
       height = THREE.MathUtils.clamp(height, 0, 1);
@@ -1002,7 +1004,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const feet = new THREE.MeshPhysicalMaterial({
       color: selectedLeg.color,
       ...legTexture,
-      bumpScale: leg === "steel" ? 0.000008 : 0.000025,
+      bumpScale: leg === "steel" ? LEG_BUMP.steel : LEG_BUMP.wood,
       ...materialRecipe(leg === "steel" ? "steel" : "wood"),
     });
     // A neutral dark lining replaces stretched upholstery under the base.
@@ -1327,7 +1329,7 @@ export function SofaConfigurator() {
               ))}
               </div>
             </div>)}
-            <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">{selectedFabric.weave === "leather" ? "Grain tile" : selectedFabric.pattern || selectedFabric.photo ? "Pattern tile" : "Weave tile"}</span><span className="font-mono text-muted-foreground">{textureScale.toFixed(1)} cm / tile</span></span><input aria-label="Texture tile size" className="mt-2 w-full accent-primary" type="range" min={MIN_TILE_CM} max={MAX_TILE_CM} step="0.5" value={textureScale} onChange={(event) => setTextureScale(Number(event.target.value))} /></label>
+            <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">{selectedFabric.weave === "leather" ? "Grain tile" : selectedFabric.pattern || selectedFabric.photo ? "Pattern tile" : "Weave tile"}</span><span className="font-mono text-muted-foreground">{textureScale.toFixed(1)} cm / tile</span></span><input aria-label="Texture tile size" className="mt-2 w-full accent-primary" type="range" min={selectedFabric.weave === "leather" ? MIN_LEATHER_TILE_CM : MIN_TILE_CM} max={MAX_TILE_CM} step="0.5" value={textureScale} onChange={(event) => setTextureScale(Number(event.target.value))} /></label>
           </section>
           <div className="my-4 h-px bg-border" />
           <section>

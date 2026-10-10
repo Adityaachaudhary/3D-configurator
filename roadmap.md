@@ -117,5 +117,5 @@
 ## Sofa specification and texture patch
 - [x] Share existing dimensions and floor lift via sofa-spec.ts.
 - [x] Use leather swatch maps for Chesterfield and add the supplied development scale audit.
-- [ ] Apply bouclé, leather tile minimum and leg bump presets; blocked on user-supplied leather-grain.ts and material-looks.ts.
+- [x] Apply bouclé, leather tile minimum and leg bump presets (boucleHeightField wired into createSurfaceMaps, MIN_LEATHER_TILE_CM 14, LEG_BUMP wood 0.6 / steel 0.2)
 - [x] Verify Oat, Cognac and Oxblood in the viewer; all render with no browser errors and build OK.
