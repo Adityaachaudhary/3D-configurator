@@ -181,17 +181,36 @@ function createPhotoSurfaceMaps(source: HTMLImageElement, cropPixels?: number, r
   const pixels = ctx.getImageData(0, 0, size, size).data;
   const relief = new Uint8Array(pixels.length);
   const roughness = new Uint8Array(pixels.length);
+  // Strong-relief (tweed) photos get a synthetic woven crosshatch on top of the
+  // photo-derived slub relief: the flat photo luminance alone reads as smooth.
+  const tweed = reliefStrength > 0.6;
   for (let i = 0; i < pixels.length; i += 4) {
-    // Restrained photo-derived relief, not a second synthetic weave pattern.
+    const pixel = i / 4;
+    const px = pixel % size, py = Math.floor(pixel / size);
     const luminance = (pixels[i] ?? 0) * 0.2126 + (pixels[i + 1] ?? 0) * 0.7152 + (pixels[i + 2] ?? 0) * 0.0722;
-    const height = Math.round(THREE.MathUtils.clamp(128 + (luminance - 128) * reliefStrength, 0, 255));
+    let height = 128 + (luminance - 128) * reliefStrength;
+    if (tweed) {
+      const u = px / size * Math.PI * 2, v = py / size * Math.PI * 2;
+      // Rounded warp/weft yarns, ~48 per tile, with a broken-twill interlace
+      // and slub speckle so the weave reads at normal viewing distance.
+      const warp = Math.pow(0.5 + 0.5 * Math.cos(u * 48), 1.5);
+      const weft = Math.pow(0.5 + 0.5 * Math.cos(v * 48), 1.5);
+      const over = Math.sin(u * 6 + Math.sin(v * 3)) * Math.sin(v * 6 + Math.cos(u * 5)) > 0;
+      const slub = Math.sin(u * 173 + Math.sin(v * 91)) * Math.sin(v * 167 + Math.cos(u * 71));
+      height = height * 0.45 + (over ? warp : weft) * 118 + Math.max(warp, weft) * 22 + slub * 14;
+      // Thread gaps darken the photo slightly so the weave shows in colour too.
+      const gap = 1 - Math.max(warp, weft) * 0.16;
+      for (let k = 0; k < 3; k++) pixels[i + k] = Math.round(THREE.MathUtils.clamp((pixels[i + k] ?? 0) * gap, 0, 255));
+    }
+    const heightByte = Math.round(THREE.MathUtils.clamp(height, 0, 255));
     for (let k = 0; k < 3; k++) {
-      relief[i + k] = height;
+      relief[i + k] = heightByte;
       // Raised slub yarns catch light slightly; recessed gaps stay fully matte.
-      roughness[i + k] = Math.round(THREE.MathUtils.clamp(reliefStrength > 0.6 ? 255 - height * 0.12 : 245 - height * 0.04, 0, 255));
+      roughness[i + k] = Math.round(THREE.MathUtils.clamp(tweed ? 255 - heightByte * 0.18 : 245 - heightByte * 0.04, 0, 255));
     }
     relief[i + 3] = roughness[i + 3] = 255;
   }
+  if (tweed) ctx.putImageData(new ImageData(new Uint8ClampedArray(pixels.buffer.slice(0)), size, size), 0, 0);
   const configure = (texture: THREE.Texture, colorSpace: typeof THREE.SRGBColorSpace | typeof THREE.NoColorSpace) => {
     texture.colorSpace = colorSpace;
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -926,10 +945,10 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const upholstery = new THREE.MeshPhysicalMaterial({
       color: fabricColor,
       ...fabricTexture,
-      bumpScale: selectedFabric.tufted ? 0.024 : leather ? 0.00045 : selectedFabric.weave === "tweed" ? 0.0006 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
+      bumpScale: selectedFabric.tufted ? 0.024 : leather ? 0.00045 : selectedFabric.weave === "tweed" ? 0.0011 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
       ...materialRecipe(leather ? "leather" : selectedFabric.weave === "velvet" ? "velvet" : "woven", selectedFabric.tufted),
       sheenColor: fabricColor.clone().lerp(new THREE.Color(1, 1, 1), 0.35),
-      ...(selectedFabric.weave === "tweed" ? { roughness: 1, sheen: 0.35, sheenRoughness: 0.7, sheenColor: new THREE.Color(0.62, 0.58, 0.52) } : {}),
+      ...(selectedFabric.weave === "tweed" ? { roughness: 1, sheen: 0.5, sheenRoughness: 0.62, sheenColor: new THREE.Color(0.66, 0.62, 0.56) } : {}),
     });
     const feet = new THREE.MeshPhysicalMaterial({
       color: selectedLeg.color,
