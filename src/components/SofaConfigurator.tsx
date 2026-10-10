@@ -427,23 +427,43 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
           float h = dot(h3, w);
           return mix(1.0, h, clamp(vTuftMask, 0.0, 1.0));
         }
+        float tuftPanelH(int panel, vec3 p, float detail, vec2 fp) {
+          vec2 uv = (panel == 0 ? armTuftUV(p) : (panel == 1 ? seatTuftUV(p) : backTuftUV(p))) * tuftDensity;
+          return tuftProfile(uv, detail, fp);
+        }
         vec4 surfaceRelief(sampler2D tex, vec3 p) { return vec4(tuftHeight(p) + surfaceSample(tex, p).r * 0.075); }
         \n`);
       // Seams and button pockets read as softly occluded folds.
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nfloat tuftShade = tuftHeight(surfacePosition);\ndiffuseColor.rgb *= 0.74 + 0.26 * smoothstep(0.0, 0.85, tuftShade);');
       // Stretched crowns are slightly glossier than the creased seams.
       shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor * mix(1.22, 0.88, tuftShade), 0.04, 1.0);');
-      // Use physical surface derivatives: Three's normalized bump derivatives
-      // otherwise flatten large padded forms at normal viewing distances.
+      // Keep screen-space derivatives only for fine grain; probe the analytic
+      // tuft profile in physical panel coordinates to avoid 2x2-quad stair steps.
       shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `
+        // fine grain only: tiny amplitude, keep the old derivative path
         vec3 paddingDx = dFdx(-vViewPosition);
         vec3 paddingDy = dFdy(-vViewPosition);
         vec3 paddingR1 = cross(paddingDy, normal);
         vec3 paddingR2 = cross(normal, paddingDx);
         float paddingDet = dot(paddingDx, paddingR1);
-        float paddingHeight = (tuftShade * 0.042 + surfaceSample(bumpMap, surfacePosition).r * 0.00045) * ${scale.toFixed(6)};
+        float paddingHeight = surfaceSample(bumpMap, surfacePosition).r * 0.00045 * ${scale.toFixed(6)};
         vec3 paddingGradient = sign(paddingDet) * (dFdx(paddingHeight) * paddingR1 + dFdy(paddingHeight) * paddingR2);
         normal = normalize(max(abs(paddingDet), 0.00000001) * normal - paddingGradient);
+
+        // tufts: analytic gradient by central differences on the dominant panel
+        vec3 tpA = abs(normalize(surfaceNormal));
+        int tpPanel = (tpA.y >= tpA.x && tpA.y >= tpA.z) ? 1 : ((tpA.z >= tpA.x) ? 2 : 0);
+        vec2 tpUv = (tpPanel == 0 ? armTuftUV(surfacePosition) : (tpPanel == 1 ? seatTuftUV(surfacePosition) : backTuftUV(surfacePosition))) * tuftDensity;
+        vec2 tpFp = fwidth(vec2(tpUv.x + tpUv.y, tpUv.x - tpUv.y));
+        float tpDetail = 1.0 - smoothstep(0.012, 0.04, length(fwidth(surfacePosition)) * tuftDensity);
+        vec3 tpE1 = tpPanel == 0 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+        vec3 tpE2 = tpPanel == 1 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+        float tpStep = ${(0.003 * scale).toFixed(6)};
+        float tpH1 = tuftPanelH(tpPanel, surfacePosition + tpE1 * tpStep, tpDetail, tpFp) - tuftPanelH(tpPanel, surfacePosition - tpE1 * tpStep, tpDetail, tpFp);
+        float tpH2 = tuftPanelH(tpPanel, surfacePosition + tpE2 * tpStep, tpDetail, tpFp) - tuftPanelH(tpPanel, surfacePosition - tpE2 * tpStep, tpDetail, tpFp);
+        vec3 tpGradWorld = (tpE1 * tpH1 + tpE2 * tpH2) / (2.0 * tpStep) * clamp(vTuftMask, 0.0, 1.0);
+        vec3 tpGrad = (viewMatrix * vec4(tpGradWorld, 0.0)).xyz * 0.042 * ${scale.toFixed(6)};
+        normal = normalize(normal - (tpGrad - dot(tpGrad, normal) * normal));
       `);
     }
     if (pattern) {
@@ -484,7 +504,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v18-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}`;
+  material.customProgramCacheKey = () => `physical-surface-v19-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
