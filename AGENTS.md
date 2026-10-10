@@ -29,7 +29,6 @@
 - Restrict plain lining to the hidden base using undeformed source-space height below the base welt plus an inverse-transpose world-space facing normal and smooth masks; downward cushion folds keep upholstery because orientation alone misclassifies visible creases.
 - Use leather swatch maps for Chesterfield; keep analytic tuft antialiasing and derivative-free vertex relief.
 - Share dimensions and studio floor lift in `sofa-spec.ts` to keep transforms and measurements consistent.
-- Optimize the sofa offline with the reproducible `scripts/optimize-sofa.mjs` Meshoptimizer pass and a separate asset pointer; retain the original, lock triangles crossing module cut bands plus legs/base and silhouette extremes, and use normal-weighted simplification with a strict error budget to preserve curves without runtime simplification.
-- Strip TanStack devtools `data-tsd-source` tags from the 3D scene module via a post-transform Vite plugin, because R3F treats dashed props as nested object paths and crashes when they change on reload.
-
-- Import drei helpers and lucide icons by deep path (e.g. `@react-three/drei/core/OrbitControls`, `lucide-react/dist/esm/icons/box`) in the 3D modules, because the full barrels add ~15 MB of dev modules and made the preview fail to load.
+- Optimize the sofa offline with `scripts/optimize-sofa.mjs` (Meshoptimizer, separate asset pointer, original retained); lock module cut bands, legs/base and silhouette extremes under a strict error budget so curves survive without runtime simplification.
+- Strip devtools `data-tsd-source` tags from 3D modules via a post-transform Vite plugin, because R3F treats dashed props as object paths and crashes on reload.
+- Import drei helpers and lucide icons by deep path in 3D modules, because the full barrels add ~15 MB of dev modules and broke preview loading.
