@@ -142,12 +142,12 @@ Colours: the `color` field is mostly a fallback. The real colour of solids/leath
 
 ```text
 <Canvas shadows dpr=[1,1.75] camera fov 40 at VIEWS.perspective>
-  gl: antialias, preserveDrawingBuffer (screenshot), ACESFilmicToneMapping,
-      toneMappingExposure 0.95, outputColorSpace SRGB
+  gl: antialias, preserveDrawingBuffer (screenshot), NeutralToneMapping,
+      toneMappingExposure 1, outputColorSpace SRGB
   onCreated: tag canvas data-viewer-canvas, camera.layers.enable(1)
   background colour   studio ? #ebe9e4 : #d9ded8
-  ambientLight 0.5
-  directionalLight [-3,6,4] 0.9
+  ambientLight 0.15
+  directionalLight [-3,6,4] 0.6
   Environment (resolution 256, environmentIntensity 1)
      Lightformer rect key  [-3,5,4]  intensity 2.2 scale 7×5
      Lightformer rect fill [4,2,3]   intensity 1   scale 6×4
@@ -161,6 +161,7 @@ Colours: the `color` field is mostly a fallback. The real colour of solids/leath
 ```
 
 - **Environment from Lightformers** = soft studio reflections without an HDRI file. `environmentIntensity` sets `scene.environmentIntensity`.
+- **Product colour accuracy**: Khronos PBR Neutral tone mapping replaces ACES at exposure 1. Reduced ambient/directional fill preserves shadow definition; the existing rectangular environment lights remain unchanged. No Leva or separate development light rig is installed.
 - **Layers**: floor and grid are on layer 1. The main camera sees layers 0+1; the contact-shadow camera only layer 0, so floor/grid are never baked into the shadow.
 - **Grid**: drawn after the floor with depth test on but depth write off → floor can't hide it, sofa still covers it.
 - **Contact shadow** (`SofaContactShadows`): waits 700 ms after any `seats`/`scale` change, then mounts drei `ContactShadows` with `frames={1}` (one capture), position y 0.009, scale 6, far 1.5, opacity 0.38, blur 2.5, resolution 256. Colour from `--scene-contact-shadow`. No shadow work during orbit.

@@ -1121,12 +1121,12 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       shadows
       dpr={[1, 1.75]}
       camera={{ position: VIEWS.perspective, fov: 40, near: 0.1, far: 100 }}
-      gl={{ antialias: true, preserveDrawingBuffer: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.95, outputColorSpace: THREE.SRGBColorSpace }}
+      gl={{ antialias: true, preserveDrawingBuffer: true, toneMapping: THREE.NeutralToneMapping, toneMappingExposure: 1, outputColorSpace: THREE.SRGBColorSpace }}
       onCreated={({ gl, camera }) => { gl.domElement.dataset["viewerCanvas"] = "true"; camera.layers.enable(1); }}
     >
       <color attach="background" args={[studio ? "#ebe9e4" : "#d9ded8"]} />
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[-3, 6, 4]} intensity={0.9} />
+      <ambientLight intensity={0.15} />
+      <directionalLight position={[-3, 6, 4]} intensity={0.6} />
       <Environment resolution={256} environmentIntensity={1}>
         <Lightformer form="rect" intensity={2.2} position={[-3, 5, 4]} target={[0, 0.4, 0]} scale={[7, 5, 1]} />
         <Lightformer form="rect" intensity={1} position={[4, 2, 3]} target={[0, 0.4, 0]} scale={[6, 4, 1]} />
