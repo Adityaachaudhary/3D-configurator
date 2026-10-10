@@ -57,6 +57,7 @@ src/
     material-looks.ts    resolveLook(id, family, tufted), OVERRIDES, applyLook – per-fabric upholstery looks
     leather-grain.ts     leatherHeightField(size, cells=40) – Worley leather grain; boucleHeightField(size, cells=14) – bouclé loops
     texture-repeat.ts    DEFAULT/MIN/MAX_TILE_CM, tileDensity(cm)
+    sofa-spec.ts         INCH, SOFA_2_SEATER (58×33×32"), SEAT_STEP (24"), seatingWidth(), BASE_SIZE, FLOOR_LIFT {studio 0.015, ar 0}
     utils.ts             cn()
   assets/
     Panache-OPAA.glb.asset.json        original model pointer (kept, unused at runtime)
@@ -89,7 +90,7 @@ vite.config.ts             strip-r3f-tsd-source plugin
 |---|---|---|
 | 44–50 | types | `FabricId`, `PatternKind`, `FabricPreset`, `LegId`, `Unit`, `ViewName`, `SeatCount` |
 | 52–62 | `useReducedMotion` | Reads `prefers-reduced-motion`; disables animations |
-| 64–68 | constants | `MODULE_WIDTH 0.7`, `INCH_METERS`, `seatingWidth()`, `BASE_SIZE` |
+| 67 | constants | `MODULE_WIDTH 0.7` — real-world sizes are imported from `src/lib/sofa-spec.ts` |
 | 70–86 | `FABRICS` | 14 presets |
 | 87–92 | `LEGS` | 4 leg finishes |
 | 93–98 | `VIEWS` | camera positions for presets |
@@ -216,8 +217,13 @@ Source X range ≈ −1.05…1.05; `MODULE_WIDTH = 0.7`.
 
 ### Exact size chart
 ```ts
-seatingWidth(seats) = (34 + (seats − 1) × 24) × 0.0254 m   // 34", 58", 82"
-BASE_SIZE.height = 32", BASE_SIZE.depth = 33"
+// src/lib/sofa-spec.ts — the single source of real-world sizes (metres)
+INCH = 0.0254
+SOFA_2_SEATER = { width: 58", depth: 33", height: 32" }   // client-agreed numbers live here
+SEAT_STEP = 24"                                            // width added per extra seat
+seatingWidth(seats) = SOFA_2_SEATER.width + (seats − 2) × SEAT_STEP   // 34", 58", 82"
+BASE_SIZE = { width, height: 32", depth: 33" }
+FLOOR_LIFT = { studio: 0.015, ar: 0 }   // AR must sit exactly on the real floor
 ```
 Each frame, the whole assembly is scaled from the **real source bounds** so its width = `seatingWidth(current)` (accounting for the inserted module), height = 32", depth = 33", times user `scale`, and placed on the floor (y 0.015) centred. The chair is calibrated from its own bounds. The same numbers drive `Dimensions`, `Metric` cards and `CameraRig`.
 
