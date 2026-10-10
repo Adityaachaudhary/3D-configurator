@@ -86,3 +86,6 @@
 ## Client Orange Pattern fabric
 - [x] Replace Teal Diamond with the uploaded Orange Pattern photograph in the sidebar and upholstery.
 - [x] Verify the photo finish on all seating sizes, tile adjustment and unchanged legs.
+## Remove unused stripe fabrics
+- [x] Delete Ocean Stripe and Graphite Stripe, their colour tokens and the unused stripe generator.
+- [x] Verify the remaining sixteen fabrics and that the sofa still renders on all seating sizes.
