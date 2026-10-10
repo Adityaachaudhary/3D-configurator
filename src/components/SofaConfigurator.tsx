@@ -23,6 +23,7 @@ import Ruler from "lucide-react/dist/esm/icons/ruler";
 import Scan from "lucide-react/dist/esm/icons/scan";
 import SunMedium from "lucide-react/dist/esm/icons/sun-medium";
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+console.info("[scale audit] module loaded");
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
