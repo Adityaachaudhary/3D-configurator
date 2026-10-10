@@ -55,8 +55,7 @@ src/
   lib/
     material-recipes.ts  materialRecipe(family, tufted) – physical parameters
     material-looks.ts    resolveLook(id, family, tufted), OVERRIDES, applyLook – per-fabric upholstery looks
-    leather-grain.ts     leatherHeightField(size, cells=40) – deterministic seamless Worley leather grain
-    dev-tuning.tsx       DevPanel / LightRig / useLookTuner – leva live tuning (dev only)
+    leather-grain.ts     leatherHeightField(size, cells=40) – Worley leather grain; boucleHeightField(size, cells=14) – bouclé loops
     texture-repeat.ts    DEFAULT/MIN/MAX_TILE_CM, tileDensity(cm)
     utils.ts             cn()
   assets/
@@ -70,7 +69,7 @@ src/
   test/
     material-recipes.test.ts   recipe ranges per family
     material-looks.test.ts     dark velvet/photo sheen, tweed override, relief and clone preservation
-    leather-grain.test.ts      512px bounded grain, deterministic output, seamless edge variation
+    leather-grain.test.ts      bounded leather grain + bouclé domes, deterministic output, seamless edge variation
     texture-repeat.test.ts     cm → tiles/m conversion and clamping
     sofa-optimization.test.ts  20 % reduction + protected vertices
     app-routing.test.tsx       route smoke test
@@ -128,7 +127,7 @@ vite.config.ts             strip-r3f-tsd-source plugin
 
 | Group | Fabrics | weave |
 |---|---|---|
-| Solids | Oat Bouclé (loop), Wisdom (linen + photo), Clay Twill (twill), Forest Chenille (loop), Ink Velvet (velvet) | as listed |
+| Solids | Oat Bouclé (boucle), Wisdom (linen + photo), Clay Twill (twill), Forest Chenille (loop), Ink Velvet (velvet) | as listed |
 | Patterns | Ochre Chevron (procedural `pattern`, twill); Swatch Urban, Red Fish, Orange Pattern (`printed: true` + uploaded `photo`) | as listed |
 | Leather | Cognac, Charcoal, Olive | leather |
 | Chesterfield | Oxblood, Saddle | leather + `tufted: true` |
