@@ -265,7 +265,7 @@ Base: metalness 0, sheen 0, sheenRoughness 0.5, clearcoat 0, clearcoatRoughness 
 The GLB UVs are an atlas; cut/mirrored/stretched modules would show stretched and restarted textures. So `projectSurface` hooks `material.onBeforeCompile` and replaces UV lookups with **triplanar sampling in world space**.
 
 ### Uniforms
-- `surfaceDensity = density / scale` (tiles per meter; ÷scale keeps the tile the same physical size as the model grows… relative to the model)
+- `surfaceDensity = density / scale` (tiles per meter in world space; dividing by scale makes the pattern grow with the model, so each tile keeps the same size on the sofa)
 - `patternMap`, `patternDensity = patternRepeat / scale`
 - `undersideColor`
 - tuft: `tuftDensity = 4.5 / scale`, `tuftDepth = 0.0015 × scale`
