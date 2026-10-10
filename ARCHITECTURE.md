@@ -85,36 +85,36 @@ vite.config.ts             strip-r3f-tsd-source plugin
 
 | Lines | Symbol | Role |
 |---|---|---|
-| 43–49 | types | `FabricId`, `PatternKind`, `FabricPreset`, `LegId`, `Unit`, `ViewName`, `SeatCount` |
-| 51–61 | `useReducedMotion` | Reads `prefers-reduced-motion`; disables animations |
-| 63–67 | constants | `MODULE_WIDTH 0.7`, `INCH_METERS`, `seatingWidth()`, `BASE_SIZE` |
-| 69–85 | `FABRICS` | 14 presets |
-| 86–91 | `LEGS` | 4 leg finishes |
-| 92–97 | `VIEWS` | camera positions for presets |
-| 99–104 | `formatDimension` | meters → "x cm/mm/in" |
-| 107–165 | `createSurfaceMaps` | procedural colour/bump/roughness DataTextures |
-| 167–229 | `createPhotoSurfaceMaps` | client photo → seamless maps (+ tweed crosshatch) |
-| 231–268 | `createPatternCanvas` | 1024px pattern artwork |
-| 270–297 | `FabricSwatch` | sidebar swatch preview |
-| 299–300 | `weaveDensity`, `leatherDensity` | aliases of `tileDensity` |
-| 307–330 | `tuftProfileGLSL` | GLSL Chesterfield profile + panel UV functions |
-| 332–484 | `projectSurface` | shader injection for all materials |
-| 486–603 | `splitSofaGeometry` | separates legs from fabric, prepares attributes |
-| 605–664 | `tuftPanelFrame` | smoothed panel direction + tuft mask per vertex |
-| 666–726 | `sliceModule` | exact clipping of geometry between two X planes |
-| 728–751 | `reflectedGeometry` | mirror in X and fix winding |
-| 753–772 | `softenMirrorPlane` | smooth normals at a mirror seam |
-| 774–779 | `joinedModule` | 3-seater middle insert |
-| 781–1000 | `SofaModel` | builds modules, materials, animation, renders meshes |
-| 1002–1017 | `DimensionLabel` | projects HTML label to screen |
-| 1019–1055 | `Dimensions` | ruler lines + labels |
-| 1057–1093 | `CameraRig` | view presets, fit distance, button zoom |
-| 1095–1113 | `SofaContactShadows` | delayed one-shot contact shadow |
-| 1115–1170 | `Viewer` | Canvas, lights, floor, grid, controls |
-| 1172–1178 | `ToolButton` | toolbar icon button |
-| 1180–1315 | `SofaConfigurator` | state + full UI layout |
-| 1317–1319 | `Metric` | dimension card |
-| 1321 | `useGLTF.preload` | starts model download early |
+| 44–50 | types | `FabricId`, `PatternKind`, `FabricPreset`, `LegId`, `Unit`, `ViewName`, `SeatCount` |
+| 52–62 | `useReducedMotion` | Reads `prefers-reduced-motion`; disables animations |
+| 64–68 | constants | `MODULE_WIDTH 0.7`, `INCH_METERS`, `seatingWidth()`, `BASE_SIZE` |
+| 70–86 | `FABRICS` | 14 presets |
+| 87–92 | `LEGS` | 4 leg finishes |
+| 93–98 | `VIEWS` | camera positions for presets |
+| 100–105 | `formatDimension` | meters → "x cm/mm/in" |
+| 108–166 | `createSurfaceMaps` | procedural colour/bump/roughness DataTextures |
+| 168–230 | `createPhotoSurfaceMaps` | client photo → seamless maps (+ tweed crosshatch) |
+| 232–269 | `createPatternCanvas` | 1024px pattern artwork |
+| 271–298 | `FabricSwatch` | sidebar swatch preview |
+| 300–301 | `weaveDensity`, `leatherDensity` | aliases of `tileDensity` |
+| 308–331 | `tuftProfileGLSL` | GLSL Chesterfield profile + panel UV functions |
+| 333–485 | `projectSurface` | shader injection for all materials |
+| 487–604 | `splitSofaGeometry` | separates legs from fabric, prepares attributes |
+| 606–665 | `tuftPanelFrame` | smoothed panel direction + tuft mask per vertex |
+| 667–727 | `sliceModule` | exact clipping of geometry between two X planes |
+| 729–752 | `reflectedGeometry` | mirror in X and fix winding |
+| 754–773 | `softenMirrorPlane` | smooth normals at a mirror seam |
+| 775–780 | `joinedModule` | 3-seater middle insert |
+| 782–999 | `SofaModel` | builds modules, materials, animation, renders meshes |
+| 1001–1016 | `DimensionLabel` | projects HTML label to screen |
+| 1018–1054 | `Dimensions` | ruler lines + labels |
+| 1056–1092 | `CameraRig` | view presets, fit distance, button zoom |
+| 1094–1112 | `SofaContactShadows` | delayed one-shot contact shadow |
+| 1114–1169 | `Viewer` | Canvas, lights, floor, grid, controls |
+| 1171–1177 | `ToolButton` | toolbar icon button |
+| 1179–1314 | `SofaConfigurator` | state + full UI layout |
+| 1316–1318 | `Metric` | dimension card |
+| 1320 | `useGLTF.preload` | starts model download early |
 
 ---
 
