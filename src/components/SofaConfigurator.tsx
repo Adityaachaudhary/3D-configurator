@@ -926,6 +926,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   const leather = selectedFabric.weave === "leather";
   const family: UpholsteryFamily = leather ? "leather" : selectedFabric.weave === "velvet" ? "velvet" : "woven";
   const whiteBase = Boolean(selectedFabric.pattern || selectedFabric.photo);
+  const look = resolveLook(selectedFabric.id, family, Boolean(selectedFabric.tufted));
   const fabricPhoto = useTexture(selectedFabric.photo ?? wisdomAsset.url);
   const patternTexture = useMemo(() => {
     if (!selectedFabric.pattern) return null;
