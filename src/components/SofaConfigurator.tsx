@@ -1331,8 +1331,8 @@ export function SofaConfigurator() {
             <div className="mt-3 grid grid-cols-3 gap-1.5 text-center"><Metric label="Width" value={seatingWidth(seats) * scale} unit={unit} /><Metric label="Height" value={BASE_SIZE.height * scale} unit={unit} /><Metric label="Depth" value={BASE_SIZE.depth * scale} unit={unit} /></div>
           </section>
           <div className="my-4 h-px bg-border" />
-          <Button variant="outline" type="button" onClick={reset} className="h-9 w-full gap-2 text-[12px] font-semibold" aria-label="Reset configuration to defaults">
-            <Undo2 className="size-3.5" /> Reset to defaults
+          <Button variant="outline" type="button" onClick={resetMaterialSettings} className="h-9 w-full gap-2 text-[12px] font-semibold" aria-label="Reset material settings to defaults" title="Reset tile size, scale, units and view for the current material">
+            <Undo2 className="size-3.5" /> Reset material settings
           </Button>
         </div>
       </aside>
