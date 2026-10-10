@@ -1353,6 +1353,18 @@ export function SofaConfigurator() {
           </section>
         </div>
       </aside>
+      <section aria-label="Price" className="absolute bottom-5 left-3 z-20 w-44 rounded-md border border-border/60 bg-surface p-3 shadow-panel sm:left-5">
+        <h2 className="font-display text-[11px] font-semibold uppercase text-muted-foreground">Price</h2>
+        <dl className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+          <div className="flex items-center justify-between"><dt>{seats} seater</dt><dd className="font-mono">{formatINR(seats * PRICE_PER_SEAT)}</dd></div>
+          <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedFabric.name}</dt><dd className="font-mono">{formatINR(fabricRate)}</dd></div>
+          <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedLeg.name}</dt><dd className="font-mono">{formatINR(PRICE_PER_LEG_FINISH)}</dd></div>
+        </dl>
+        <div className="mt-2 flex items-baseline justify-between border-t border-border/60 pt-2">
+          <span className="text-[11px] font-medium">Total</span>
+          <span className="font-display text-lg font-semibold">{formatINR(price)}</span>
+        </div>
+      </section>
       <div className="pointer-events-none absolute bottom-20 left-3 hidden items-center gap-2 rounded-md bg-surface/85 px-3 py-2 text-[10px] font-medium text-muted-foreground shadow-sm lg:flex"><Maximize2 className="size-3" /> Drag to orbit · scroll or pinch to zoom · right-drag to pan</div>
     </main>
   );
