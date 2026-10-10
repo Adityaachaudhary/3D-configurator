@@ -1215,6 +1215,9 @@ export function SofaConfigurator() {
   const reset = useCallback(() => {
     setSeats(2); setFabric("oat"); setLeg("oak"); setTextureScale(DEFAULT_TILE_CM); setScale(1); setGrid(true); setMeasures(true); setRotate(false); setStudio(true); setWireframe(false); setUnit("cm"); setView("perspective");
   }, []);
+  const resetMaterialSettings = useCallback(() => {
+    setTextureScale(DEFAULT_TILE_CM); setScale(1); setUnit("cm"); setView("perspective"); setWireframe(false); setRotate(false);
+  }, []);
   const screenshot = () => {
     const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-viewer-canvas='true']");
     if (!canvas) return;
