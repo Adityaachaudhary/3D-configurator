@@ -39,6 +39,7 @@ import { boucleHeightField, leatherHeightField } from "@/lib/leather-grain";
 import { seatingWidth, BASE_SIZE, FLOOR_LIFT } from "@/lib/sofa-spec";
 import { LightRig } from "@/lib/static-light-rig";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
+import { PRICE_PER_SEAT, PRICE_PER_LEG_FINISH, fabricPrice, totalPrice, formatINR } from "@/lib/pricing";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "check" | "chevron" | "diamond";
@@ -1254,6 +1255,8 @@ export function SofaConfigurator() {
   };
   const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
   const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
+  const fabricRate = fabricPrice(selectedFabric);
+  const price = totalPrice(seats, selectedFabric);
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
