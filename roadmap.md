@@ -109,3 +109,7 @@
 - [x] Add leva dependency and src/lib/dev-tuning.tsx (DevPanel, LightRig, useLookTuner)
 - [x] Replace Viewer lights block with LightRig; mount DevPanel; wire useLookTuner after chairMaterials
 - [x] Replace material-looks.ts and leather-grain.ts with the uploaded Worley-grain / lerp-sheen versions; update tests
+## Fixed material settings
+- [ ] Remove live tuning and reset controls, replace lighting with a static rig and remove leva.
+- [ ] Apply weave contrast, directional photo mapping, preset tile selection and preset-driven shader settings.
+- [ ] Verify material tests and the live viewer across seating variants.
