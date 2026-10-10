@@ -1277,7 +1277,7 @@ export function SofaConfigurator() {
           <span className="text-sm font-semibold">Configure sofa · {seats} seater</span><ChevronDown className={cn("size-4 transition-transform", panelOpen && "rotate-180")} />
         </Button>
         <div className="configuration-scroll h-[calc(100%_-_3.25rem)] overflow-y-auto px-4 pb-24 pt-5 sm:h-full sm:pb-6">
-          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-1 font-display text-xl font-semibold leading-tight">Make it yours</h1></div><Move3D className="size-4 text-muted-foreground" /></div>
+          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-1 font-display text-xl font-semibold leading-tight">Make it yours</h1></div><Button variant="outline" size="sm" type="button" onClick={resetMaterialSettings} className="h-8 gap-1.5 px-2.5 text-[11px] font-semibold" aria-label="Reset material settings to defaults" title="Reset tile size, scale, units and view for the current material"><Undo2 className="size-3.5" /> Reset</Button></div>
           <section className="mt-4" aria-labelledby="seating-heading">
             <div className="flex items-center justify-between"><h2 id="seating-heading" className="text-[13px] font-semibold">Seating</h2><span className="text-[11px] text-muted-foreground">{seats} seater</span></div>
             <div className="mt-2 grid grid-cols-3 gap-1.5" role="group" aria-label="Seating options">
