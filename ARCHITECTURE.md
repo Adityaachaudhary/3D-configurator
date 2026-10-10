@@ -123,7 +123,7 @@ vite.config.ts             strip-r3f-tsd-source plugin
 | Group | Fabrics | weave |
 |---|---|---|
 | Solids | Oat Bouclé (loop), Wisdom (linen + photo), Clay Twill (twill), Forest Chenille (loop), Ink Velvet (velvet) | as listed |
-| Patterns | Olive Check (linen); Ochre Chevron (twill); Red Fish, Orange Pattern (uploaded client photos) | procedural `pattern`, or `printed: true` + uploaded `photo` |
+| Patterns | Swatch Urban (linen); Ochre Chevron (twill); Red Fish, Orange Pattern (uploaded client photos) | procedural `pattern`, or `printed: true` + uploaded `photo` |
 | Leather | Cognac, Charcoal, Olive | leather |
 | Chesterfield | Oxblood, Saddle | leather + `tufted: true` |
 
