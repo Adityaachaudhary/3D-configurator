@@ -119,3 +119,6 @@
 - [x] Use leather swatch maps for Chesterfield and add the supplied development scale audit.
 - [x] Apply bouclé, leather tile minimum and leg bump presets (boucleHeightField wired into createSurfaceMaps, MIN_LEATHER_TILE_CM 14, LEG_BUMP wood 0.6 / steel 0.2)
 - [x] Verify Oat, Cognac and Oxblood in the viewer; all render with no browser errors and build OK.
+## Shared real-world sizes
+- [x] Move every real-world size into one module (two-seater 58×33×32", 24" per extra seat, studio lift 1.5 cm, AR lift 0).
+- [x] Verify displayed sizes still read 86.4 / 147.3 / 208.3 cm wide, 83.8 deep, 81.3 high.
