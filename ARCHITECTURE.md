@@ -252,7 +252,7 @@ Base: metalness 0, sheen 0, sheenRoughness 0.5, clearcoat 0, clearcoatRoughness 
 | Function | Output |
 |---|---|
 | `createSurfaceMaps(kind)` | 256px (2048px for `"tuft"`) seamless `DataTexture`s: `map` (neutral near-white microstructure, sRGB), `bumpMap` (height), `roughnessMap` (0.88–1.0). Kinds: wood (grain sines), steel (brushed lines), loop, velvet (fine noise), leather (pebble grain), tuft (diamond), default linen/twill (warp/weft). All values clamped (Uint8 overflow made black spots). The colour map is neutral so the fabric colour isn't multiplied twice. |
-| `createPhotoSurfaceMaps(img)` | Central square crop of the photo drawn 4× mirrored into a 1024px canvas (seamless, no stretching). bump = luminance with 0.45 contrast; roughness ≈ 0.96 inverse to height. |
+| `createPhotoSurfaceMaps(img, cropPixels?)` | Central square crop of the photo drawn 4× mirrored into a 1024px canvas (seamless, no stretching). Red Fish uses a 128px source crop so its many tiny motifs remain visible at the default physical tile size; Wisdom uses the largest square crop. bump = luminance with 0.45 contrast; roughness ≈ 0.96 inverse to height. |
 | `createPatternCanvas(fabric)` | 1024px pattern from 3 token colours, with a faint 3 % thread modulation. stripe/check/chevron/diamond formulas. |
 | `patternTexture` | `CanvasTexture` of that canvas (sRGB, repeat). |
 | `FabricSwatch` | 192px canvas: procedural patterns tiled 3×3; plain/leather = token colour × `createSurfaceMaps` colour (tuft map for Chesterfield). Wisdom and Red Fish show their original photo `<img>` with the selected fabric's accessible name. |

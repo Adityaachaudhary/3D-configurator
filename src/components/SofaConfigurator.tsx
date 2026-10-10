@@ -166,13 +166,13 @@ function createSurfaceMaps(kind: string) {
 
 // Mirror a square crop without stretching its threads. Opposing edges match,
 // avoiding hard photo borders across cushions and derived seating modules.
-function createPhotoSurfaceMaps(source: HTMLImageElement) {
+function createPhotoSurfaceMaps(source: HTMLImageElement, cropPixels?: number) {
   const size = 1024;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return createSurfaceMaps("linen");
-  const crop = Math.min(source.naturalWidth, source.naturalHeight);
+  const crop = Math.min(source.naturalWidth, source.naturalHeight, cropPixels ?? Infinity);
   for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) {
     ctx.save();
     ctx.translate(x ? size : 0, y ? size : 0);
@@ -894,8 +894,8 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   }, [selectedFabric]);
   useEffect(() => () => patternTexture?.dispose(), [patternTexture]);
   const fabricTexture = useMemo(
-    () => selectedFabric.photo ? createPhotoSurfaceMaps(fabricPhoto.image as HTMLImageElement) : createSurfaceMaps(selectedFabric.weave),
-    [selectedFabric.weave, selectedFabric.photo, fabricPhoto],
+    () => selectedFabric.photo ? createPhotoSurfaceMaps(fabricPhoto.image as HTMLImageElement, selectedFabric.id === "red-fish" ? 128 : undefined) : createSurfaceMaps(selectedFabric.weave),
+    [selectedFabric.id, selectedFabric.weave, selectedFabric.photo, fabricPhoto],
   );
   const legTexture = useMemo(() => createSurfaceMaps(leg === "steel" ? "steel" : "wood"), [leg]);
   useEffect(() => () => Object.values(fabricTexture).forEach((map) => map.dispose()), [fabricTexture]);
