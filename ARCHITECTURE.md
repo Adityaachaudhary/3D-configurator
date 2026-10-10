@@ -13,7 +13,7 @@ A full-screen browser 3D configurator for one supplied sofa model (Panache OPAA,
 | Feature | Details |
 |---|---|
 | Seating | 1, 2 or 3 seater, animated transitions, all derived from the one 2-seater mesh |
-| Upholstery | 18 finishes: Solids (6, including client photo fabric "Wisdom"), Patterns (6), Leather & Chesterfield (4 + 2) |
+| Upholstery | 16 finishes: Solids (6, including client photo fabric "Wisdom"), Patterns (4), Leather & Chesterfield (4 + 2) |
 | Legs | Natural oak, Dark walnut, Ebonized wood, Brushed steel |
 | Texture tile | Slider 5–25 cm per tile (step 0.5, default 12.5). Label switches between "Grain tile" / "Pattern tile" / "Weave tile" |
 | Size | Model scale 80–120 %, exact inch size chart, units cm / mm / in |
@@ -85,7 +85,7 @@ vite.config.ts             strip-r3f-tsd-source plugin
 | 41–47 | types | `FabricId`, `PatternKind`, `FabricPreset`, `LegId`, `Unit`, `ViewName`, `SeatCount` |
 | 49–59 | `useReducedMotion` | Reads `prefers-reduced-motion`; disables animations |
 | 61–65 | constants | `MODULE_WIDTH 0.7`, `INCH_METERS`, `seatingWidth()`, `BASE_SIZE` |
-| 66–85 | `FABRICS` | 18 presets |
+| 68–85 | `FABRICS` | 16 presets |
 | 86–91 | `LEGS` | 4 leg finishes |
 | 92–97 | `VIEWS` | camera positions for presets |
 | 101–104 | `formatDimension` | meters → "x cm/mm/in" |
@@ -123,7 +123,7 @@ vite.config.ts             strip-r3f-tsd-source plugin
 | Group | Fabrics | weave |
 |---|---|---|
 | Solids | Oat Bouclé (loop), Pearl Linen (linen), Wisdom (linen + photo), Clay Twill (twill), Forest Chenille (loop), Ink Velvet (velvet) | as listed |
-| Patterns | Ocean Stripe, Olive Check, Graphite Stripe (linen); Ochre Chevron (twill); Red Fish, Orange Pattern (uploaded client photos) | procedural `pattern`, or `printed: true` + uploaded `photo` |
+| Patterns | Olive Check (linen); Ochre Chevron (twill); Red Fish, Orange Pattern (uploaded client photos) | procedural `pattern`, or `printed: true` + uploaded `photo` |
 | Leather | Cognac, Charcoal, Ivory, Olive | leather |
 | Chesterfield | Oxblood, Saddle | leather + `tufted: true` |
 
@@ -254,7 +254,7 @@ Base: metalness 0, sheen 0, sheenRoughness 0.5, clearcoat 0, clearcoatRoughness 
 |---|---|
 | `createSurfaceMaps(kind)` | 256px (2048px for `"tuft"`) seamless `DataTexture`s: `map` (neutral near-white microstructure, sRGB), `bumpMap` (height), `roughnessMap` (0.88–1.0). Kinds: wood (grain sines), steel (brushed lines), loop, velvet (fine noise), leather (pebble grain), tuft (diamond), default linen/twill (warp/weft). All values clamped (Uint8 overflow made black spots). The colour map is neutral so the fabric colour isn't multiplied twice. |
 | `createPhotoSurfaceMaps(img, cropPixels?)` | Central square crop of the photo drawn 4× mirrored into a 1024px canvas (seamless, no stretching). Red Fish uses a 128px source crop so its many tiny motifs remain visible at the default physical tile size; Wisdom and Orange Pattern use the largest square crop (Orange Pattern's source is 436×380, so its medium-scale stripes survive the upscale). bump = luminance with 0.45 contrast; roughness ≈ 0.96 inverse to height. |
-| `createPatternCanvas(fabric)` | 1024px pattern from 3 token colours, with a faint 3 % thread modulation. stripe/check/chevron/diamond formulas (diamond has no remaining preset since Teal Diamond was replaced by Orange Pattern). |
+| `createPatternCanvas(fabric)` | 1024px pattern from 3 token colours, with a faint 3 % thread modulation. check/chevron/diamond formulas. The stripe formula was removed with Ocean Stripe and Graphite Stripe; diamond has no remaining preset since Teal Diamond was replaced by Orange Pattern. |
 | `patternTexture` | `CanvasTexture` of that canvas (sRGB, repeat). |
 | `FabricSwatch` | 192px canvas: procedural patterns tiled 3×3; plain/leather = token colour × `createSurfaceMaps` colour (tuft map for Chesterfield). Wisdom, Red Fish and Orange Pattern show their original photo `<img>` with the selected fabric's accessible name. |
 
@@ -341,7 +341,7 @@ bun scripts/optimize-sofa.mjs input.glb output.glb report.json
 - Bump the shader cache key when changing shader strings.
 - Don't select parts by GLB material name (only one exists) and don't use mesh UVs for fabric.
 - Clamp procedural byte values before writing Uint8Arrays.
-- Leftovers: `--fabric-sage` token and `.fabric-swatch[data-fabric=…]` CSS rules are no longer used (Sage was replaced by Wisdom; swatches are canvases now). Component-bounds arrays in `splitSofaGeometry` are computed but unused. The `"tuft"` texture is only used for swatch previews; the sofa uses the analytic shader.
+- Leftovers: `--fabric-sage` token and `.fabric-swatch[data-fabric=…]` CSS rules are no longer used (Sage was replaced by Wisdom; swatches are canvases now), and `--pattern-rose-check-*` tokens are unused (Rose Check was replaced by Red Fish). Component-bounds arrays in `splitSofaGeometry` are computed but unused. The `"tuft"` texture is only used for swatch previews; the sofa uses the analytic shader.
 
 ---
 
