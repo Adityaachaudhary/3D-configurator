@@ -102,5 +102,5 @@
 - [x] Add seamless 512px cellular leather grain, crease contrast/roughness and accurate swatch sampling; lower ordinary leather bump depth.
 - [x] Pass fourteen grain/material/repeat tests; verify all five leathers on all three seating sizes and 5/25cm tile endpoints without runtime errors; update architecture documentation.
 ## Chesterfield analytic normals
-- [ ] Apply dominant-panel profile probes for tuft normals, retain fine-grain derivatives and bump the shader cache version.
-- [ ] Verify GPU compilation and both Chesterfields across all seating sizes, update documentation.
+- [x] Apply dominant-panel profile probes for tuft normals, retain fine-grain derivatives and bump the shader cache version to v19.
+- [x] Verify GPU program linking without GLSL/console errors for both Chesterfields on all seating sizes and 80/120% scale; inspect close-up edges and update documentation.

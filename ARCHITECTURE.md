@@ -295,7 +295,7 @@ The GLB UVs are an atlas; cut/mirrored/stretched modules would show stretched an
   - bump derivatives use `dFdx(surfacePosition)` (3D) and `surfaceSample` (or `surfaceRelief` for tufted)
 - **Pattern**: after `color_fragment`, `diffuseColor *= triplanar(patternMap)` with sharper weights `|n|^12`, offset 1.5 cm in Y.
 - **Base lining**: before `alphamap_fragment`, mix to `undersideColor` where `surfaceBaseHeight < −0.305…−0.320` AND facing down (`y < −0.60…−0.85`). Both soft — visible cushion folds keep the fabric.
-- **Cache key**: `physical-surface-v18-panel-analytic-<density>-<repeat>-<scale>-<pattern uuid>-<tufted>-<photo>-<lined>`. Bump the version when editing shader text.
+- **Cache key**: `physical-surface-v19-panel-analytic-<density>-<repeat>-<scale>-<pattern uuid>-<tufted>-<photo>-<lined>`. Bump the version when editing shader text.
 
 ---
 
@@ -307,7 +307,9 @@ The GLB UVs are an atlas; cut/mirrored/stretched modules would show stretched an
 - Effects on shading:
   - colour × `0.74 + 0.26·smoothstep(0, 0.85, tuftShade)` (darker seams)
   - roughness × `mix(1.22, 0.88, tuftShade)` (glossier crowns)
-  - normal perturbed from screen-space derivatives of `paddingHeight = (tuftShade·0.042 + grain·0.00045) × scale` (replaces `normal_fragment_maps`)
+  - `normal_fragment_maps` is replaced in two stages: fine grain alone keeps screen-space derivatives at `grain × 0.00045 × scale`; tuft normals use central differences of the analytic profile, not derivatives of `tuftShade` across pixel quads.
+  - `tuftPanelH(panel, p, detail, fp)` samples one panel profile. Dominant axis selection chooses seat (Y), back (Z) or arm (X), with panel-aligned world-space tangent vectors. Four samples at ±`0.003 × scale` metres yield the two partial derivatives, sharing the centre pixel's antialias footprint/detail.
+  - The gradient is divided by twice the probe distance, multiplied by `vTuftMask`, converted to view space, then scaled by `0.042 × scale` metres. Its component along the normal is removed before normalizing the perturbed result. Reduce 0.042 for flatter padding; increase the 3mm probe to suppress noise or decrease it for sharper pockets. These are JS template-literal values inside `projectSurface`.
   - `surfaceRelief` = tuft height + 0.075 × grain, feeding three's bump code
 - Grain size follows the tile slider; diamond size does not (`tuftDensity` fixed 4.5/m).
 
