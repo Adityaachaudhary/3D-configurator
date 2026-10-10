@@ -62,6 +62,7 @@ src/
     sofa-optimization-report.json      optimizer output
     wisdom-fabric.png.asset.json       client fabric photo pointer
     red-fish-fabric.png.asset.json     uploaded Red Fish print, replacing Rose Check
+    orange-pattern-fabric.png.asset.json  uploaded Orange Pattern stripe, replacing Teal Diamond
   test/
     material-recipes.test.ts   recipe ranges per family
     texture-repeat.test.ts     cm → tiles/m conversion and clamping
@@ -122,11 +123,11 @@ vite.config.ts             strip-r3f-tsd-source plugin
 | Group | Fabrics | weave |
 |---|---|---|
 | Solids | Oat Bouclé (loop), Pearl Linen (linen), Wisdom (linen + photo), Clay Twill (twill), Forest Chenille (loop), Ink Velvet (velvet) | as listed |
-| Patterns | Ocean Stripe, Olive Check, Red Fish, Graphite Stripe (linen); Ochre Chevron, Teal Diamond (twill) | procedural `pattern`, or `printed: true` + uploaded `photo` for Red Fish |
+| Patterns | Ocean Stripe, Graphite Stripe (linen); Ochre Chevron (twill); Red Fish, Orange Pattern (uploaded client photos) | procedural `pattern`, or `printed: true` + uploaded `photo` |
 | Leather | Cognac, Charcoal, Ivory, Olive | leather |
 | Chesterfield | Oxblood, Saddle | leather + `tufted: true` |
 
-Colours: the `color` field is mostly a fallback. The real colour of solids/leathers comes from CSS token `--fabric-<id>`; procedural pattern colours from `--pattern-<id>-base/accent/detail`; Wisdom and Red Fish use white material tint so their photos show unaltered. The UI groups fabrics by filter: patterns = has `pattern` or `printed`, leather = `weave === "leather"`, solids = the rest. `useTexture(selectedFabric.photo ?? wisdomAsset.url)` loads the selected photograph; `createPhotoSurfaceMaps` derives matched colour, relief and roughness maps. Red Fish uses the same joined physical-coordinate projection and per-panel phases as Wisdom on the sofa and chair materials, without changing leg materials.
+Colours: the `color` field is mostly a fallback. The real colour of solids/leathers comes from CSS token `--fabric-<id>`; procedural pattern colours from `--pattern-<id>-base/accent/detail`; Wisdom, Red Fish and Orange Pattern use white material tint so their photos show unaltered. The UI groups fabrics by filter: patterns = has `pattern` or `printed`, leather = `weave === "leather"`, solids = the rest. `useTexture(selectedFabric.photo ?? wisdomAsset.url)` loads the selected photograph; `createPhotoSurfaceMaps` derives matched colour, relief and roughness maps. Every photo fabric uses the same joined physical-coordinate projection and per-panel phases as Wisdom on the sofa and chair materials, without changing leg materials.
 
 ### Legs (`LEGS`)
 `{ id, name, color, metalness, roughness }`. Only `color` is used by the material; physical values come from `materialRecipe("wood" | "steel")`. Sidebar swatch colour uses `.leg-swatch[data-leg]` → `--leg-*`.
@@ -252,10 +253,10 @@ Base: metalness 0, sheen 0, sheenRoughness 0.5, clearcoat 0, clearcoatRoughness 
 | Function | Output |
 |---|---|
 | `createSurfaceMaps(kind)` | 256px (2048px for `"tuft"`) seamless `DataTexture`s: `map` (neutral near-white microstructure, sRGB), `bumpMap` (height), `roughnessMap` (0.88–1.0). Kinds: wood (grain sines), steel (brushed lines), loop, velvet (fine noise), leather (pebble grain), tuft (diamond), default linen/twill (warp/weft). All values clamped (Uint8 overflow made black spots). The colour map is neutral so the fabric colour isn't multiplied twice. |
-| `createPhotoSurfaceMaps(img, cropPixels?)` | Central square crop of the photo drawn 4× mirrored into a 1024px canvas (seamless, no stretching). Red Fish uses a 128px source crop so its many tiny motifs remain visible at the default physical tile size; Wisdom uses the largest square crop. bump = luminance with 0.45 contrast; roughness ≈ 0.96 inverse to height. |
-| `createPatternCanvas(fabric)` | 1024px pattern from 3 token colours, with a faint 3 % thread modulation. stripe/check/chevron/diamond formulas. |
+| `createPhotoSurfaceMaps(img, cropPixels?)` | Central square crop of the photo drawn 4× mirrored into a 1024px canvas (seamless, no stretching). Red Fish uses a 128px source crop so its many tiny motifs remain visible at the default physical tile size; Wisdom and Orange Pattern use the largest square crop (Orange Pattern's source is 436×380, so its medium-scale stripes survive the upscale). bump = luminance with 0.45 contrast; roughness ≈ 0.96 inverse to height. |
+| `createPatternCanvas(fabric)` | 1024px pattern from 3 token colours, with a faint 3 % thread modulation. stripe/check/chevron/diamond formulas (diamond has no remaining preset since Teal Diamond was replaced by Orange Pattern). |
 | `patternTexture` | `CanvasTexture` of that canvas (sRGB, repeat). |
-| `FabricSwatch` | 192px canvas: procedural patterns tiled 3×3; plain/leather = token colour × `createSurfaceMaps` colour (tuft map for Chesterfield). Wisdom and Red Fish show their original photo `<img>` with the selected fabric's accessible name. |
+| `FabricSwatch` | 192px canvas: procedural patterns tiled 3×3; plain/leather = token colour × `createSurfaceMaps` colour (tuft map for Chesterfield). Wisdom, Red Fish and Orange Pattern show their original photo `<img>` with the selected fabric's accessible name. |
 
 **Texture settings effect** (lines 902–914): colour maps & pattern → `SRGBColorSpace`; bump/roughness → `NoColorSpace`; `anisotropy = gl.capabilities.getMaxAnisotropy()`; mipmaps; `LinearMipmapLinearFilter` / `LinearFilter`.
 
