@@ -22,6 +22,13 @@ export function DevPanel() {
   return <Leva hidden={!import.meta.env.DEV} collapsed />;
 }
 
+// Sidebar "Reset" calls this to return the active fabric's sliders (and live
+// material) to its stock look from material-looks.ts.
+let resetActiveLook: (() => void) | null = null;
+export function resetLookTuner() {
+  resetActiveLook?.();
+}
+
 export function useLookTuner(
   id: string,
   look: MaterialLook,
@@ -29,9 +36,11 @@ export function useLookTuner(
   targets: THREE.MeshPhysicalMaterial[],
 ) {
   const latest = useRef<MaterialLook>(look);
-  const values = useControls(
+  const stock = useRef<MaterialLook>(look);
+  stock.current = look;
+  const [values, set] = useControls(
     `Look · ${id}`,
-    {
+    () => ({
       roughness: { value: look.roughness, min: 0, max: 1, step: 0.01 },
       sheen: { value: look.sheen, min: 0, max: 1, step: 0.01 },
       sheenRoughness: { value: look.sheenRoughness, min: 0, max: 1, step: 0.01 },
@@ -44,10 +53,24 @@ export function useLookTuner(
       "copy JSON": button(() => {
         void navigator.clipboard.writeText(JSON.stringify({ [id]: latest.current }, null, 2));
       }),
-    },
+    }),
     [id],
   );
   latest.current = values as unknown as MaterialLook;
+
+  useEffect(() => {
+    resetActiveLook = () => {
+      const l = stock.current;
+      set({
+        roughness: l.roughness, sheen: l.sheen, sheenRoughness: l.sheenRoughness, sheenTint: l.sheenTint,
+        sheenGrey: l.sheenGrey, clearcoat: l.clearcoat, clearcoatRoughness: l.clearcoatRoughness,
+        specularIntensity: l.specularIntensity, bumpScale: l.bumpScale,
+      });
+      const base = targets[0]?.userData["baseColor"] as THREE.Color | undefined;
+      if (base) for (const material of targets) applyLook(material, l, base, whiteBase);
+    };
+    return () => { resetActiveLook = null; };
+  }, [set, targets, whiteBase]);
 
   useEffect(() => {
     const base = targets[0]?.userData["baseColor"] as THREE.Color | undefined;
