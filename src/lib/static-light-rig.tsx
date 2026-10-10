@@ -6,11 +6,12 @@ import { LIGHTING } from "./material-looks";
 export function LightRig() {
   return createElement(Fragment, null,
     createElement("ambientLight", { intensity: LIGHTING.ambient }),
-    createElement("directionalLight", { position: [-3, 6, 4], intensity: LIGHTING.directional }),
-    createElement(Environment, { resolution: 256, environmentIntensity: LIGHTING.environment, frames: 1 },
-      createElement(Lightformer, { form: "rect", intensity: LIGHTING.key, position: [-3, 5, 4], target: [0, 0.4, 0], scale: [7, 5, 1] }),
-      createElement(Lightformer, { form: "rect", intensity: LIGHTING.fill, position: [4, 2, 3], target: [0, 0.4, 0], scale: [6, 4, 1] }),
-      createElement(Lightformer, { form: "rect", intensity: LIGHTING.rim, position: [1, 4, -4], target: [0, 0.4, 0], scale: [5, 3, 1] }),
+    createElement("directionalLight", LIGHTING.directional),
+    createElement(Environment, { resolution: 256, environmentIntensity: LIGHTING.environmentIntensity, frames: 1 },
+      createElement("color", { attach: "background", args: [LIGHTING.envBase, LIGHTING.envBase, LIGHTING.envBase] }),
+      createElement(Lightformer, { form: "rect", ...LIGHTING.key, target: [0, 0.4, 0] }),
+      createElement(Lightformer, { form: "rect", ...LIGHTING.fill, target: [0, 0.4, 0] }),
+      createElement(Lightformer, { form: "rect", ...LIGHTING.rim, target: [0, 0.4, 0] }),
     ),
   );
 }
