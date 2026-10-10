@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
 import { applyLook, resolveLook, type UpholsteryFamily } from "@/lib/material-looks";
 import { leatherHeightField } from "@/lib/leather-grain";
+import { DevPanel, LightRig, useLookTuner } from "@/lib/dev-tuning";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
@@ -925,6 +926,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   const leather = selectedFabric.weave === "leather";
   const family: UpholsteryFamily = leather ? "leather" : selectedFabric.weave === "velvet" ? "velvet" : "woven";
   const whiteBase = Boolean(selectedFabric.pattern || selectedFabric.photo);
+  const look = resolveLook(selectedFabric.id, family, Boolean(selectedFabric.tufted));
   const fabricPhoto = useTexture(selectedFabric.photo ?? wisdomAsset.url);
   const patternTexture = useMemo(() => {
     if (!selectedFabric.pattern) return null;
@@ -968,7 +970,6 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       const rgb = colorContext.getImageData(0, 0, 1, 1).data;
       fabricColor = new THREE.Color().setRGB((rgb[0] ?? 0) / 255, (rgb[1] ?? 0) / 255, (rgb[2] ?? 0) / 255, THREE.SRGBColorSpace);
     }
-    const look = resolveLook(selectedFabric.id, family, Boolean(selectedFabric.tufted));
     const upholstery = new THREE.MeshPhysicalMaterial({ color: fabricColor, ...fabricTexture });
     applyLook(upholstery, look, fabricColor, whiteBase);
     upholstery.userData["baseColor"] = fabricColor;
@@ -990,7 +991,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     projectSurface(upholstery, leather ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale), scale, patternTexture, tileDensity(textureScale), selectedFabric.tufted ?? false, undersideColor, Boolean(selectedFabric.photo));
     projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
-  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture, leather, family, whiteBase]);
+  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture, leather, look, whiteBase]);
   const chairMaterials = useMemo(() => materials.map((material, i) => {
     const clone = material.clone();
     const lining = material.userData["undersideColor"];
@@ -998,6 +999,8 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     return clone;
   }), [materials, textureScale, leg, scale, patternTexture, selectedFabric]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
+  // Dev-only live look tuning; edits the upholstery materials without shader recompiles.
+  useLookTuner(selectedFabric.id, look, whiteBase, useMemo(() => [materials[0], chairMaterials[0]].filter((m): m is THREE.MeshPhysicalMaterial => Boolean(m)), [materials, chairMaterials]));
   useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
   useEffect(() => {
     for (const material of [...materials, ...chairMaterials]) material.wireframe = wireframe;
@@ -1147,13 +1150,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       onCreated={({ gl, camera }) => { gl.domElement.dataset["viewerCanvas"] = "true"; camera.layers.enable(1); }}
     >
       <color attach="background" args={[studio ? "#ebe9e4" : "#d9ded8"]} />
-      <ambientLight intensity={0.15} />
-      <directionalLight position={[-3, 6, 4]} intensity={0.6} />
-      <Environment resolution={256} environmentIntensity={1}>
-        <Lightformer form="rect" intensity={2.2} position={[-3, 5, 4]} target={[0, 0.4, 0]} scale={[7, 5, 1]} />
-        <Lightformer form="rect" intensity={1} position={[4, 2, 3]} target={[0, 0.4, 0]} scale={[6, 4, 1]} />
-        <Lightformer form="rect" intensity={0.85} position={[1, 4, -4]} target={[0, 0.4, 0]} scale={[5, 3, 1]} />
-      </Environment>
+      <LightRig />
       <mesh rotation-x={-Math.PI / 2} position-y={0} receiveShadow onUpdate={(floor) => floor.layers.set(1)}>
         <planeGeometry args={[30, 30]} />
         <meshStandardMaterial color={studio ? "#e3e0da" : "#ccd3cc"} roughness={0.96} />
@@ -1237,6 +1234,7 @@ export function SofaConfigurator() {
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
+      <DevPanel />
       <div className="absolute inset-0 sm:right-[var(--panel-width)]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} wireframe={wireframe} />{measures && (["width", "height", "depth"] as const).map((axis) => <span key={axis} data-dimension={axis} className="pointer-events-none absolute left-0 top-0 z-10 whitespace-nowrap rounded-sm bg-dimension px-1.5 py-0.5 font-mono text-[11px] text-dimension-foreground" />)}</div>
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between border-b border-border/60 bg-surface px-4 sm:px-6">
         <div className="pointer-events-auto flex items-center gap-3">

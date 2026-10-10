@@ -55,7 +55,8 @@ src/
   lib/
     material-recipes.ts  materialRecipe(family, tufted) – physical parameters
     material-looks.ts    resolveLook(id, family, tufted), OVERRIDES, applyLook – per-fabric upholstery looks
-    leather-grain.ts     leatherHeightField(size) – deterministic seamless 40-cell leather grain
+    leather-grain.ts     leatherHeightField(size, cells=40) – deterministic seamless Worley leather grain
+    dev-tuning.tsx       DevPanel / LightRig / useLookTuner – leva live tuning (dev only)
     texture-repeat.ts    DEFAULT/MIN/MAX_TILE_CM, tileDensity(cm)
     utils.ts             cn()
   assets/
@@ -236,7 +237,7 @@ Each frame, the whole assembly is scaled from the **real source bounds** so its 
     - `resolveLook(id, family, tufted)` merges family defaults with `OVERRIDES` from `material-looks.ts`; `applyLook` applies the result after constructing the material with its colour/maps. The old inline tweed override is removed.
     - Solid sheen preserves base hue by multiplying linear base RGB by `sheenTint` (default 1.25, Ink Velvet 1.1), never lerping toward linear white. Photo/pattern white-base materials use an explicitly sRGB-decoded `sheenGrey` (Wisdom/Red Fish/Orange Pattern 0.2, Ochre Chevron 0.22, Swatch Urban 0.24). These starting tuning values prevent the old white/grey veil.
     - Swatch Urban override keeps roughness 1, sheen 0.5, sheenRoughness 0.62 and bumpScale 0.0011. Oat/Forest retain loop relief 0.00018; ordinary leather starts at 0.0001 for its steeper cellular grain, while Chesterfield tuft relief remains unchanged.
-    - `upholstery.userData["baseColor"]` stores the untampered base colour. `applyLook` leaves maps and shader hooks alone; `projectSurface` is still installed afterwards. No optional live tuner or DevPanel is mounted.
+    - `upholstery.userData["baseColor"]` stores the untampered base colour. `applyLook` leaves maps and shader hooks alone; `projectSurface` is still installed afterwards. Live tuning: `useLookTuner(selectedFabric.id, look, whiteBase, [materials[0], chairMaterials[0]])` runs after `chairMaterials` in SofaModel, and `<DevPanel />` (leva, hidden outside DEV) is rendered once in SofaConfigurator.
 3. **Legs** = `MeshPhysicalMaterial`: leg colour, `...legTexture` (wood or steel maps), bumpScale steel 0.000008 / wood 0.000025, `...materialRecipe("steel" | "wood")`.
 4. **Underside lining colour** from `--fabric-underside`.
 5. `projectSurface(upholstery, tileDensity(cm), scale, patternTexture, tileDensity(cm), tufted, undersideColor, isPhoto)` and `projectSurface(legs, steel ? 3 : 1.6, scale)`.
@@ -269,7 +270,7 @@ Base: metalness 0, sheen 0, sheenRoughness 0.5, clearcoat 0, clearcoatRoughness 
 
 **Texture settings effect** (lines 902–914): colour maps & pattern → `SRGBColorSpace`; bump/roughness → `NoColorSpace`; `anisotropy = gl.capabilities.getMaxAnisotropy()`; mipmaps; `LinearMipmapLinearFilter` / `LinearFilter`.
 
-Leather's material roughness remains 0.58 from the physical family recipe; the height-dependent roughness **map multiplies** that value rather than replacing it. The tile slider controls the shared physical density on sofa modules and chair clones; the new grain does not alter geometry or tuft diamond size. No live tuning panel is currently installed—adjust starting strengths in `material-looks.ts`.
+Leather's material roughness remains 0.58 from the physical family recipe; the height-dependent roughness **map multiplies** that value rather than replacing it. The tile slider controls the shared physical density on sofa modules and chair clones; the new grain does not alter geometry or tuft diamond size. Live tuning is installed: the leva panel (dev only) edits the active look via `useLookTuner`; press "copy JSON" and paste the result into `OVERRIDES` in `material-looks.ts` to make a tuning permanent.
 
 ---
 

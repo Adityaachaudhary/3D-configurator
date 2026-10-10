@@ -104,3 +104,8 @@
 ## Chesterfield analytic normals
 - [x] Apply dominant-panel profile probes for tuft normals, retain fine-grain derivatives and bump the shader cache version to v19.
 - [x] Verify GPU program linking without GLSL/console errors for both Chesterfields on all seating sizes and 80/120% scale; inspect close-up edges and update documentation.
+
+## Dev tuning panel
+- [x] Add leva dependency and src/lib/dev-tuning.tsx (DevPanel, LightRig, useLookTuner)
+- [x] Replace Viewer lights block with LightRig; mount DevPanel; wire useLookTuner after chairMaterials
+- [x] Replace material-looks.ts and leather-grain.ts with the uploaded Worley-grain / lerp-sheen versions; update tests
