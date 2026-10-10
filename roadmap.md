@@ -99,5 +99,5 @@
 - [x] Add resolveLook/applyLook with per-fabric overrides, colour-faithful sheen, and retained relief; remove the inline tweed override.
 - [x] Pass eight material tests; verify Ink Velvet, Wisdom, Swatch Urban and Saddle Chesterfield on all three sizes without runtime errors; update architecture documentation.
 ## Real leather grain
-- [ ] Add seamless 512px cellular leather grain, crease contrast/roughness and accurate swatch sampling; lower ordinary leather bump depth.
-- [ ] Test grain and material defaults, verify leather across all seating sizes and tile adjustments, and update architecture documentation.
+- [x] Add seamless 512px cellular leather grain, crease contrast/roughness and accurate swatch sampling; lower ordinary leather bump depth.
+- [x] Pass fourteen grain/material/repeat tests; verify all five leathers on all three seating sizes and 5/25cm tile endpoints without runtime errors; update architecture documentation.
