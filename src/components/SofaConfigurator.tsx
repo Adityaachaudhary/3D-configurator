@@ -1215,6 +1215,9 @@ export function SofaConfigurator() {
   const reset = useCallback(() => {
     setSeats(2); setFabric("oat"); setLeg("oak"); setTextureScale(DEFAULT_TILE_CM); setScale(1); setGrid(true); setMeasures(true); setRotate(false); setStudio(true); setWireframe(false); setUnit("cm"); setView("perspective");
   }, []);
+  const resetMaterialSettings = useCallback(() => {
+    setTextureScale(DEFAULT_TILE_CM); setScale(1); setUnit("cm"); setView("perspective"); setWireframe(false); setRotate(false);
+  }, []);
   const screenshot = () => {
     const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-viewer-canvas='true']");
     if (!canvas) return;
@@ -1328,8 +1331,8 @@ export function SofaConfigurator() {
             <div className="mt-3 grid grid-cols-3 gap-1.5 text-center"><Metric label="Width" value={seatingWidth(seats) * scale} unit={unit} /><Metric label="Height" value={BASE_SIZE.height * scale} unit={unit} /><Metric label="Depth" value={BASE_SIZE.depth * scale} unit={unit} /></div>
           </section>
           <div className="my-4 h-px bg-border" />
-          <Button variant="outline" type="button" onClick={reset} className="h-9 w-full gap-2 text-[12px] font-semibold" aria-label="Reset configuration to defaults">
-            <Undo2 className="size-3.5" /> Reset to defaults
+          <Button variant="outline" type="button" onClick={resetMaterialSettings} className="h-9 w-full gap-2 text-[12px] font-semibold" aria-label="Reset material settings to defaults" title="Reset tile size, scale, units and view for the current material">
+            <Undo2 className="size-3.5" /> Reset material settings
           </Button>
         </div>
       </aside>
