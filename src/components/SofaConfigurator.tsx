@@ -991,7 +991,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     projectSurface(upholstery, leather ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale), scale, patternTexture, tileDensity(textureScale), selectedFabric.tufted ?? false, undersideColor, Boolean(selectedFabric.photo));
     projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
-  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture, leather, family, whiteBase]);
+  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture, leather, look, whiteBase]);
   const chairMaterials = useMemo(() => materials.map((material, i) => {
     const clone = material.clone();
     const lining = material.userData["undersideColor"];
@@ -999,6 +999,8 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     return clone;
   }), [materials, textureScale, leg, scale, patternTexture, selectedFabric]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
+  // Dev-only live look tuning; edits the upholstery materials without shader recompiles.
+  useLookTuner(selectedFabric.id, look, whiteBase, useMemo(() => [materials[0], chairMaterials[0]].filter((m): m is THREE.MeshPhysicalMaterial => Boolean(m)), [materials, chairMaterials]));
   useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
   useEffect(() => {
     for (const material of [...materials, ...chairMaterials]) material.wireframe = wireframe;
