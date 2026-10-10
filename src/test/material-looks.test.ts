@@ -31,8 +31,12 @@ describe("per-fabric material looks", () => {
     expect(look.sheenRoughness).toBe(0.62);
     expect(look.bumpScale).toBe(0.0011);
   });
-  it("preserves leather and Chesterfield relief and the shader hook", () => {
-    expect(resolveLook("charcoal-leather", "leather").bumpScale).toBe(0.00045);
+  it("starts steeper ordinary leather grain at 0.0001 bump depth", () => {
+    for (const id of ["cognac-leather", "charcoal-leather", "olive-leather"]) {
+      expect(resolveLook(id, "leather").bumpScale).toBe(0.0001);
+    }
+  });
+  it("preserves Chesterfield relief and the shader hook", () => {
     const look = resolveLook("chesterfield-saddle", "leather", true);
     expect(look.bumpScale).toBe(0.024);
     expect(look.clearcoat).toBe(0.04);

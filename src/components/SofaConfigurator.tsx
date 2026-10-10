@@ -40,6 +40,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
 import { applyLook, resolveLook, type UpholsteryFamily } from "@/lib/material-looks";
+import { leatherHeightField } from "@/lib/leather-grain";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
@@ -106,7 +107,8 @@ function formatDimension(meters: number, unit: Unit) {
 // Neutral microstructure keeps the selected colour from being multiplied twice.
 // All maps use the same physical projection, independent of the imported UV atlas.
 function createSurfaceMaps(kind: string) {
-  const size = kind === "tuft" ? 2048 : 256;
+  const size = kind === "tuft" ? 2048 : kind === "leather" ? 512 : 256;
+  const grain = kind === "leather" ? leatherHeightField(size) : null;
   const colour = new Uint8Array(size * size * 4);
   const relief = new Uint8Array(size * size * 4);
   const rough = new Uint8Array(size * size * 4);
@@ -120,7 +122,7 @@ function createSurfaceMaps(kind: string) {
       else if (kind === "steel") height = 0.5 + 0.2 * Math.sin(u * 95) + noise * 0.05;
       else if (kind === "loop") height = 0.5 + 0.23 * Math.sin(u * 20 + Math.sin(v * 24)) * Math.cos(v * 24 + Math.sin(u * 20)) + noise * 0.1;
       else if (kind === "velvet") height = 0.5 + noise * 0.12;
-      else if (kind === "leather") height = 0.5 + 0.19 * Math.sin(u * 12 + 2 * Math.sin(v * 7)) * Math.sin(v * 15 + Math.cos(u * 9)) + noise * 0.04;
+      else if (kind === "leather") height = 0.15 + 0.7 * (grain?.[y * size + x] ?? 0.5);
       else if (kind === "tuft") {
         const a = (x / size + y / size) % 1;
         const b = ((x / size - y / size) % 1 + 1) % 1;
@@ -138,14 +140,14 @@ function createSurfaceMaps(kind: string) {
         height = 0.5 + 0.22 * (over > 0 ? warp : weft) + noise * 0.06;
       }
       const i = (y * size + x) * 4;
-      const contrast = kind === "wood" ? 0.3 : kind === "leather" ? 0.12 : kind === "velvet" ? 0.045 : 0.10;
+      const contrast = kind === "wood" ? 0.3 : kind === "leather" ? 0.2 : kind === "velvet" ? 0.045 : 0.10;
       // Clamp: Uint8Array wraps out-of-range values, which turned wood grain crests black.
       const value = Math.round(255 * THREE.MathUtils.clamp(kind === "tuft" ? 0.72 + height * 0.28 : 0.94 + (height - 0.5) * contrast, 0, 1));
       height = THREE.MathUtils.clamp(height, 0, 1);
       for (let k = 0; k < 3; k += 1) {
         colour[i + k] = value;
         relief[i + k] = Math.round(height * 255);
-        rough[i + k] = Math.round(255 * (0.88 + height * 0.12));
+        rough[i + k] = Math.round(255 * (kind === "leather" ? 0.78 + (1 - height) * 0.22 : 0.88 + height * 0.12));
       }
       colour[i + 3] = relief[i + 3] = rough[i + 3] = 255;
     }
@@ -280,12 +282,13 @@ function FabricSwatch({ fabric }: { fabric: FabricPreset }) {
     } else {
       const maps = createSurfaceMaps(fabric.tufted ? "tuft" : fabric.weave);
       const data = maps.map.image.data;
+      const w = maps.map.image.width;
       const image = ctx.createImageData(192, 192);
       ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(`--fabric-${fabric.id}`).trim();
       ctx.fillRect(0, 0, 1, 1);
       const color = ctx.getImageData(0, 0, 1, 1).data;
       for (let i = 0; i < 192 * 192; i++) {
-        const source = ((Math.floor(i / 192) * 256 + i % 192) * 4);
+        const source = ((Math.floor(i / 192) * w + i % 192) * 4);
         for (let k = 0; k < 3; k++) image.data[i * 4 + k] = (color[k] ?? 0) * (data?.[source] ?? 255) / 255;
         image.data[i * 4 + 3] = 255;
       }

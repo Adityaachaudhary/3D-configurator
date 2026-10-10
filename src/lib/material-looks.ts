@@ -27,7 +27,7 @@ export const OVERRIDES: Readonly<Record<string, Partial<MaterialLook>>> = {
 export function resolveLook(id: string, family: UpholsteryFamily, tufted = false): MaterialLook {
   return {
     ...materialRecipe(family, tufted),
-    bumpScale: tufted ? 0.024 : family === "leather" ? 0.00045 : family === "velvet" ? 0.00004 : 0.00009,
+    bumpScale: tufted ? 0.024 : family === "leather" ? 0.0001 : family === "velvet" ? 0.00004 : 0.00009,
     sheenGrey: 0.22,
     sheenTint: 1.25,
     ...OVERRIDES[id],
