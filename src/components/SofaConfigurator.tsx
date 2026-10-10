@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
-type FabricId = "oat" | "wisdom" | "clay" | "ink" | "pearl" | "moss" | "olive-check" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "ivory-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
+type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "olive-check" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "check" | "chevron" | "diamond";
 type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; printed?: boolean; tufted?: boolean; photo?: string };
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
@@ -67,7 +67,6 @@ const seatingWidth = (seats: number) => (34 + (seats - 1) * 24) * INCH_METERS;
 const BASE_SIZE = { width: seatingWidth(2), height: 32 * INCH_METERS, depth: 33 * INCH_METERS };
 const FABRICS: FabricPreset[] = [
   { id: "oat", name: "Oat Bouclé", family: "Bouclé 04", color: "#b8aa91", weave: "loop" },
-  { id: "pearl", name: "Pearl Linen", family: "Linen 01", color: "#d7d2c7", weave: "linen" },
   { id: "wisdom", name: "Wisdom", family: "Client fabric", color: "", weave: "linen", photo: wisdomAsset.url },
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
@@ -78,7 +77,6 @@ const FABRICS: FabricPreset[] = [
   { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "", weave: "twill", printed: true, photo: orangeAsset.url },
   { id: "cognac-leather", name: "Cognac Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "charcoal-leather", name: "Charcoal Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
-  { id: "ivory-leather", name: "Ivory Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "olive-leather", name: "Olive Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "chesterfield-oxblood", name: "Oxblood Chesterfield", family: "Leather · Button tufted", color: "", weave: "leather", tufted: true },
   { id: "chesterfield-saddle", name: "Saddle Chesterfield", family: "Leather · Button tufted", color: "", weave: "leather", tufted: true },

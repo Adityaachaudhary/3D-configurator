@@ -13,7 +13,7 @@ A full-screen browser 3D configurator for one supplied sofa model (Panache OPAA,
 | Feature | Details |
 |---|---|
 | Seating | 1, 2 or 3 seater, animated transitions, all derived from the one 2-seater mesh |
-| Upholstery | 16 finishes: Solids (6, including client photo fabric "Wisdom"), Patterns (4), Leather & Chesterfield (4 + 2) |
+| Upholstery | 14 finishes: Solids (5, including client photo fabric "Wisdom"), Patterns (4), Leather & Chesterfield (3 + 2) |
 | Legs | Natural oak, Dark walnut, Ebonized wood, Brushed steel |
 | Texture tile | Slider 5–25 cm per tile (step 0.5, default 12.5). Label switches between "Grain tile" / "Pattern tile" / "Weave tile" |
 | Size | Model scale 80–120 %, exact inch size chart, units cm / mm / in |
@@ -82,36 +82,36 @@ vite.config.ts             strip-r3f-tsd-source plugin
 
 | Lines | Symbol | Role |
 |---|---|---|
-| 41–47 | types | `FabricId`, `PatternKind`, `FabricPreset`, `LegId`, `Unit`, `ViewName`, `SeatCount` |
-| 49–59 | `useReducedMotion` | Reads `prefers-reduced-motion`; disables animations |
-| 61–65 | constants | `MODULE_WIDTH 0.7`, `INCH_METERS`, `seatingWidth()`, `BASE_SIZE` |
-| 68–85 | `FABRICS` | 16 presets |
-| 86–91 | `LEGS` | 4 leg finishes |
-| 92–97 | `VIEWS` | camera positions for presets |
-| 101–104 | `formatDimension` | meters → "x cm/mm/in" |
-| 108–164 | `createSurfaceMaps` | procedural colour/bump/roughness DataTextures |
-| 168–209 | `createPhotoSurfaceMaps` | Wisdom photo → seamless maps |
-| 212–250 | `createPatternCanvas` | 1024px pattern artwork |
-| 252–278 | `FabricSwatch` | sidebar swatch preview |
-| 281–282 | `weaveDensity`, `leatherDensity` | aliases of `tileDensity` |
-| 289–312 | `tuftProfileGLSL` | GLSL Chesterfield profile + panel UV functions |
-| 314–466 | `projectSurface` | shader injection for all materials |
-| 468–581 | `splitSofaGeometry` | separates legs from fabric, prepares attributes |
-| 587–644 | `tuftPanelFrame` | smoothed panel direction + tuft mask per vertex |
-| 648–706 | `sliceModule` | exact clipping of geometry between two X planes |
-| 710–733 | `reflectedGeometry` | mirror in X and fix winding |
-| 735–754 | `softenMirrorPlane` | smooth normals at a mirror seam |
-| 756–761 | `joinedModule` | 3-seater middle insert |
-| 763–981 | `SofaModel` | builds modules, materials, animation, renders meshes |
-| 983–998 | `DimensionLabel` | projects HTML label to screen |
-| 1000–1036 | `Dimensions` | ruler lines + labels |
-| 1038–1072 | `CameraRig` | view presets, fit distance, button zoom |
-| 1076–1094 | `SofaContactShadows` | delayed one-shot contact shadow |
-| 1096–1151 | `Viewer` | Canvas, lights, floor, grid, controls |
-| 1153–1159 | `ToolButton` | toolbar icon button |
-| 1161–1296 | `SofaConfigurator` | state + full UI layout |
-| 1298–1300 | `Metric` | dimension card |
-| 1302 | `useGLTF.preload` | starts model download early |
+| 43–49 | types | `FabricId`, `PatternKind`, `FabricPreset`, `LegId`, `Unit`, `ViewName`, `SeatCount` |
+| 51–61 | `useReducedMotion` | Reads `prefers-reduced-motion`; disables animations |
+| 63–67 | constants | `MODULE_WIDTH 0.7`, `INCH_METERS`, `seatingWidth()`, `BASE_SIZE` |
+| 68–83 | `FABRICS` | 14 presets |
+| 84–89 | `LEGS` | 4 leg finishes |
+| 90–95 | `VIEWS` | camera positions for presets |
+| 99–104 | `formatDimension` | meters → "x cm/mm/in" |
+| 106–164 | `createSurfaceMaps` | procedural colour/bump/roughness DataTextures |
+| 166–208 | `createPhotoSurfaceMaps` | Wisdom photo → seamless maps |
+| 210–247 | `createPatternCanvas` | 1024px pattern artwork |
+| 249–276 | `FabricSwatch` | sidebar swatch preview |
+| 278–279 | `weaveDensity`, `leatherDensity` | aliases of `tileDensity` |
+| 286–309 | `tuftProfileGLSL` | GLSL Chesterfield profile + panel UV functions |
+| 311–463 | `projectSurface` | shader injection for all materials |
+| 465–582 | `splitSofaGeometry` | separates legs from fabric, prepares attributes |
+| 584–643 | `tuftPanelFrame` | smoothed panel direction + tuft mask per vertex |
+| 645–705 | `sliceModule` | exact clipping of geometry between two X planes |
+| 707–730 | `reflectedGeometry` | mirror in X and fix winding |
+| 732–751 | `softenMirrorPlane` | smooth normals at a mirror seam |
+| 753–758 | `joinedModule` | 3-seater middle insert |
+| 760–978 | `SofaModel` | builds modules, materials, animation, renders meshes |
+| 980–995 | `DimensionLabel` | projects HTML label to screen |
+| 997–1033 | `Dimensions` | ruler lines + labels |
+| 1035–1071 | `CameraRig` | view presets, fit distance, button zoom |
+| 1073–1091 | `SofaContactShadows` | delayed one-shot contact shadow |
+| 1093–1148 | `Viewer` | Canvas, lights, floor, grid, controls |
+| 1150–1156 | `ToolButton` | toolbar icon button |
+| 1158–1293 | `SofaConfigurator` | state + full UI layout |
+| 1295–1297 | `Metric` | dimension card |
+| 1299 | `useGLTF.preload` | starts model download early |
 
 ---
 
@@ -122,9 +122,9 @@ vite.config.ts             strip-r3f-tsd-source plugin
 
 | Group | Fabrics | weave |
 |---|---|---|
-| Solids | Oat Bouclé (loop), Pearl Linen (linen), Wisdom (linen + photo), Clay Twill (twill), Forest Chenille (loop), Ink Velvet (velvet) | as listed |
+| Solids | Oat Bouclé (loop), Wisdom (linen + photo), Clay Twill (twill), Forest Chenille (loop), Ink Velvet (velvet) | as listed |
 | Patterns | Olive Check (linen); Ochre Chevron (twill); Red Fish, Orange Pattern (uploaded client photos) | procedural `pattern`, or `printed: true` + uploaded `photo` |
-| Leather | Cognac, Charcoal, Ivory, Olive | leather |
+| Leather | Cognac, Charcoal, Olive | leather |
 | Chesterfield | Oxblood, Saddle | leather + `tufted: true` |
 
 Colours: the `color` field is mostly a fallback. The real colour of solids/leathers comes from CSS token `--fabric-<id>`; procedural pattern colours from `--pattern-<id>-base/accent/detail`; Wisdom, Red Fish and Orange Pattern use white material tint so their photos show unaltered. The UI groups fabrics by filter: patterns = has `pattern` or `printed`, leather = `weave === "leather"`, solids = the rest. `useTexture(selectedFabric.photo ?? wisdomAsset.url)` loads the selected photograph; `createPhotoSurfaceMaps` derives matched colour, relief and roughness maps. Every photo fabric uses the same joined physical-coordinate projection and per-panel phases as Wisdom on the sofa and chair materials, without changing leg materials.
