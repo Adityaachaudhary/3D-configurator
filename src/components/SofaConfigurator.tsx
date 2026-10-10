@@ -34,12 +34,13 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import sofaAsset from "@/assets/Panache-OPAA-80pct.glb.asset.json";
 import wisdomAsset from "@/assets/wisdom-fabric.png.asset.json";
 import redFishAsset from "@/assets/red-fish-fabric.png.asset.json";
+import orangeAsset from "@/assets/orange-pattern-fabric.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
-type FabricId = "oat" | "wisdom" | "clay" | "ink" | "pearl" | "moss" | "ocean-stripe" | "olive-check" | "red-fish" | "ochre-chevron" | "teal-diamond" | "graphite-stripe" | "cognac-leather" | "charcoal-leather" | "ivory-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
+type FabricId = "oat" | "wisdom" | "clay" | "ink" | "pearl" | "moss" | "ocean-stripe" | "olive-check" | "red-fish" | "ochre-chevron" | "orange-pattern" | "graphite-stripe" | "cognac-leather" | "charcoal-leather" | "ivory-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "stripe" | "check" | "chevron" | "diamond";
 type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; printed?: boolean; tufted?: boolean; photo?: string };
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
@@ -75,7 +76,7 @@ const FABRICS: FabricPreset[] = [
   { id: "olive-check", name: "Olive Check", family: "Check · Woven", color: "#ffffff", weave: "linen", pattern: "check" },
   { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "", weave: "linen", printed: true, photo: redFishAsset.url },
   { id: "ochre-chevron", name: "Ochre Chevron", family: "Chevron · Twill", color: "#ffffff", weave: "twill", pattern: "chevron" },
-  { id: "teal-diamond", name: "Teal Diamond", family: "Diamond · Jacquard", color: "#ffffff", weave: "twill", pattern: "diamond" },
+  { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "", weave: "twill", printed: true, photo: orangeAsset.url },
   { id: "graphite-stripe", name: "Graphite Stripe", family: "Stripe · Linen", color: "#ffffff", weave: "linen", pattern: "stripe" },
   { id: "cognac-leather", name: "Cognac Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "charcoal-leather", name: "Charcoal Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
