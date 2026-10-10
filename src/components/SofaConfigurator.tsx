@@ -831,7 +831,9 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     return geometry.boundingBox?.clone() ?? null;
   }, [geometry]);
   useEffect(() => {
-    if (!import.meta.env.DEV || !sourceBounds || seats !== 2 || scale !== 1) return;
+    if (!import.meta.env.DEV) { console.info("[scale audit] skipped: not dev"); return; }
+    if (!sourceBounds) { console.info("[scale audit] skipped: no bounds"); return; }
+    if (seats !== 2 || scale !== 1) { console.info("[scale audit] skipped: seats/scale", { seats, scale }); return; }
     const timer = window.setTimeout(() => {
       if (!assembly.current) return;
       const size = new THREE.Box3().setFromObject(assembly.current).getSize(new THREE.Vector3());
