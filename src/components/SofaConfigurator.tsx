@@ -945,10 +945,10 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const upholstery = new THREE.MeshPhysicalMaterial({
       color: fabricColor,
       ...fabricTexture,
-      bumpScale: selectedFabric.tufted ? 0.024 : leather ? 0.00045 : selectedFabric.weave === "tweed" ? 0.0006 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
+      bumpScale: selectedFabric.tufted ? 0.024 : leather ? 0.00045 : selectedFabric.weave === "tweed" ? 0.0011 : selectedFabric.weave === "loop" ? 0.00018 : selectedFabric.weave === "velvet" ? 0.00004 : 0.00009,
       ...materialRecipe(leather ? "leather" : selectedFabric.weave === "velvet" ? "velvet" : "woven", selectedFabric.tufted),
       sheenColor: fabricColor.clone().lerp(new THREE.Color(1, 1, 1), 0.35),
-      ...(selectedFabric.weave === "tweed" ? { roughness: 1, sheen: 0.35, sheenRoughness: 0.7, sheenColor: new THREE.Color(0.62, 0.58, 0.52) } : {}),
+      ...(selectedFabric.weave === "tweed" ? { roughness: 1, sheen: 0.5, sheenRoughness: 0.62, sheenColor: new THREE.Color(0.66, 0.62, 0.56) } : {}),
     });
     const feet = new THREE.MeshPhysicalMaterial({
       color: selectedLeg.color,
