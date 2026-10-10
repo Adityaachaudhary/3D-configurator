@@ -1,8 +1,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   ContactShadows,
-  Environment,
-  Lightformer,
   Line,
   OrbitControls,
   useGLTF,
@@ -25,9 +23,8 @@ import {
   Ruler,
   Scan,
   SunMedium,
-  Undo2,
 } from "lucide-react";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
@@ -39,14 +36,14 @@ import orangeAsset from "@/assets/orange-pattern-fabric.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
-import { applyLook, resolveLook, type UpholsteryFamily } from "@/lib/material-looks";
+import { applyLook, resolveLook, tileFor, LIGHTING, RELIEF } from "@/lib/material-looks";
 import { leatherHeightField } from "@/lib/leather-grain";
-import { DevPanel, LightRig, resetLookTuner, useLookTuner } from "@/lib/dev-tuning";
+import { LightRig } from "@/lib/static-light-rig";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "check" | "chevron" | "diamond";
-type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; printed?: boolean; tufted?: boolean; photo?: string };
+type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; printed?: boolean; tufted?: boolean; photo?: string; directional?: boolean };
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
 type Unit = "cm" | "mm" | "in";
 type ViewName = "perspective" | "front" | "side" | "rear";
@@ -78,7 +75,7 @@ const FABRICS: FabricPreset[] = [
   { id: "swatch-urban", name: "Swatch Urban", family: "Client fabric · Textured tweed", color: "", weave: "tweed", printed: true, photo: swatchUrbanAsset.url },
   { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "", weave: "linen", printed: true, photo: redFishAsset.url },
   { id: "ochre-chevron", name: "Ochre Chevron", family: "Chevron · Twill", color: "#ffffff", weave: "twill", pattern: "chevron" },
-  { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "", weave: "twill", printed: true, photo: orangeAsset.url },
+  { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "", weave: "twill", printed: true, photo: orangeAsset.url, directional: true },
   { id: "cognac-leather", name: "Cognac Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "charcoal-leather", name: "Charcoal Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "olive-leather", name: "Olive Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
@@ -121,7 +118,7 @@ function createSurfaceMaps(kind: string) {
       let height: number;
       if (kind === "wood") height = 0.5 + 0.28 * Math.sin(u * 18 + 1.6 * Math.sin(v * 2) + 0.5 * Math.sin(v * 5)) + noise * 0.06;
       else if (kind === "steel") height = 0.5 + 0.2 * Math.sin(u * 95) + noise * 0.05;
-      else if (kind === "loop") height = 0.5 + 0.23 * Math.sin(u * 20 + Math.sin(v * 24)) * Math.cos(v * 24 + Math.sin(u * 20)) + noise * 0.1;
+      else if (kind === "loop") height = 0.5 + 0.23 * Math.sin(u * 9 + Math.sin(v * 11)) * Math.cos(v * 11 + Math.sin(u * 9)) + noise * 0.1;
       else if (kind === "velvet") height = 0.5 + noise * 0.12;
       else if (kind === "leather") height = 0.15 + 0.7 * (grain?.[y * size + x] ?? 0.5);
       else if (kind === "tuft") {
@@ -141,7 +138,7 @@ function createSurfaceMaps(kind: string) {
         height = 0.5 + 0.22 * (over > 0 ? warp : weft) + noise * 0.06;
       }
       const i = (y * size + x) * 4;
-      const contrast = kind === "wood" ? 0.3 : kind === "leather" ? 0.2 : kind === "velvet" ? 0.045 : 0.10;
+      const contrast = kind === "wood" ? 0.3 : kind === "steel" ? 0.1 : kind === "leather" ? 0.2 : kind === "velvet" ? 0.045 : kind === "loop" ? 0.5 : 0.32;
       // Clamp: Uint8Array wraps out-of-range values, which turned wood grain crests black.
       const value = Math.round(255 * THREE.MathUtils.clamp(kind === "tuft" ? 0.72 + height * 0.28 : 0.94 + (height - 0.5) * contrast, 0, 1));
       height = THREE.MathUtils.clamp(height, 0, 1);
@@ -334,19 +331,33 @@ const tuftProfileGLSL = `
   }
 `;
 
-function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null, patternRepeat = density * (8 / 5.6), tuft = false, undersideColor: THREE.Color | null = null, photo = false) {
+function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null, patternRepeat = density * (8 / 5.6), tuft = false, undersideColor: THREE.Color | null = null, photo = false, soften = 0, directional = false) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms["surfaceDensity"] = { value: density / scale };
     if (undersideColor) shader.uniforms["undersideColor"] = { value: undersideColor };
     if (tuft) {
       shader.uniforms["tuftDensity"] = { value: 4.5 / scale };
-      shader.uniforms["tuftDepth"] = { value: 0.0015 * scale };
+      shader.uniforms["tuftDepth"] = { value: RELIEF.recess * scale };
     }
     if (pattern) {
       shader.uniforms["patternMap"] = { value: pattern };
       shader.uniforms["patternDensity"] = { value: patternRepeat / scale };
     }
     shader.vertexShader = "varying vec3 surfacePosition; varying vec3 surfaceNormal; varying vec3 surfaceFacingNormal; varying float surfaceBaseHeight;\n" + shader.vertexShader;
+    if (soften > 0) {
+      shader.uniforms["normalSoften"] = { value: soften };
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", `#include <common>
+          uniform float normalSoften;
+          ${tuft ? "" : "attribute vec4 tuftFrame;"}`)
+        .replace("#include <beginnormal_vertex>", `
+          vec3 softPanel = normalize(tuftFrame.xyz + vec3(0.0001));
+          float softMask = smoothstep(0.64, 0.78, max(abs(softPanel.x), max(abs(softPanel.y), abs(softPanel.z))));
+          vec3 objectNormal = normalize(mix(vec3(normal), softPanel, normalSoften * softMask));
+          #ifdef USE_TANGENT
+            vec3 objectTangent = vec3(tangent.xyz);
+          #endif`);
+    }
     if (tuft) {
       // Evaluate in joined world coordinates BEFORE projection: every module
       // uses the same diamond grid, including the reflected chair halves.
@@ -399,7 +410,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         vec3 tileP = p * surfaceDensity;
         ${photo ? `// Distinct cutting phases/quarter-turn for arms, seats and back.
         // All three photo maps use these same coordinates; never offset by module.
-        vec2 armUV = vec2(-tileP.y, tileP.z) + vec2(0.37, 0.19);
+        vec2 armUV = ${directional ? "tileP.zy" : "vec2(-tileP.y, tileP.z)"} + vec2(0.37, 0.19);
         vec2 seatUV = tileP.xz + vec2(0.11, 0.43);
         vec2 backUV = tileP.xy + vec2(0.61, 0.07);` : `vec2 armUV = tileP.yz;
         vec2 seatUV = tileP.xz;
@@ -435,7 +446,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         vec4 surfaceRelief(sampler2D tex, vec3 p) { return vec4(tuftHeight(p) + surfaceSample(tex, p).r * 0.075); }
         \n`);
       // Seams and button pockets read as softly occluded folds.
-      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nfloat tuftShade = tuftHeight(surfacePosition);\ndiffuseColor.rgb *= 0.74 + 0.26 * smoothstep(0.0, 0.85, tuftShade);');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>\nfloat tuftShade = tuftHeight(surfacePosition);\ndiffuseColor.rgb *= ${RELIEF.seamShadeMin.toFixed(3)} + ${RELIEF.seamShadeRange.toFixed(3)} * smoothstep(0.0, 0.85, tuftShade);`);
       // Stretched crowns are slightly glossier than the creased seams.
       shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor * mix(1.22, 0.88, tuftShade), 0.04, 1.0);');
       // Keep screen-space derivatives only for fine grain; probe the analytic
@@ -447,7 +458,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         vec3 paddingR1 = cross(paddingDy, normal);
         vec3 paddingR2 = cross(normal, paddingDx);
         float paddingDet = dot(paddingDx, paddingR1);
-        float paddingHeight = surfaceSample(bumpMap, surfacePosition).r * 0.00045 * ${scale.toFixed(6)};
+        float paddingHeight = surfaceSample(bumpMap, surfacePosition).r * ${RELIEF.grainNormal.toFixed(5)} * ${scale.toFixed(6)};
         vec3 paddingGradient = sign(paddingDet) * (dFdx(paddingHeight) * paddingR1 + dFdy(paddingHeight) * paddingR2);
         normal = normalize(max(abs(paddingDet), 0.00000001) * normal - paddingGradient);
 
@@ -463,7 +474,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         float tpH1 = tuftPanelH(tpPanel, surfacePosition + tpE1 * tpStep, tpDetail, tpFp) - tuftPanelH(tpPanel, surfacePosition - tpE1 * tpStep, tpDetail, tpFp);
         float tpH2 = tuftPanelH(tpPanel, surfacePosition + tpE2 * tpStep, tpDetail, tpFp) - tuftPanelH(tpPanel, surfacePosition - tpE2 * tpStep, tpDetail, tpFp);
         vec3 tpGradWorld = (tpE1 * tpH1 + tpE2 * tpH2) / (2.0 * tpStep) * clamp(vTuftMask, 0.0, 1.0);
-        vec3 tpGrad = (viewMatrix * vec4(tpGradWorld, 0.0)).xyz * 0.042 * ${scale.toFixed(6)};
+        vec3 tpGrad = (viewMatrix * vec4(tpGradWorld, 0.0)).xyz * ${RELIEF.normalHeight.toFixed(4)} * ${scale.toFixed(6)};
         normal = normalize(normal - (tpGrad - dot(tpGrad, normal) * normal));
       `);
     }
@@ -505,7 +516,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v19-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}`;
+  material.customProgramCacheKey = () => `physical-surface-v20-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}${directional ? "-dir" : ""}-soft${soften}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
@@ -924,9 +935,6 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
   const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
   const leather = selectedFabric.weave === "leather";
-  const family: UpholsteryFamily = leather ? "leather" : selectedFabric.weave === "velvet" ? "velvet" : "woven";
-  const whiteBase = Boolean(selectedFabric.pattern || selectedFabric.photo);
-  const look = resolveLook(selectedFabric.id, family, Boolean(selectedFabric.tufted));
   const fabricPhoto = useTexture(selectedFabric.photo ?? wisdomAsset.url);
   const patternTexture = useMemo(() => {
     if (!selectedFabric.pattern) return null;
@@ -970,9 +978,13 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       const rgb = colorContext.getImageData(0, 0, 1, 1).data;
       fabricColor = new THREE.Color().setRGB((rgb[0] ?? 0) / 255, (rgb[1] ?? 0) / 255, (rgb[2] ?? 0) / 255, THREE.SRGBColorSpace);
     }
+    const family = leather ? "leather" : selectedFabric.weave === "velvet" ? "velvet" : "woven";
+    const look = resolveLook(selectedFabric.id, family, Boolean(selectedFabric.tufted));
+    const whiteBase = Boolean(selectedFabric.pattern || selectedFabric.photo);
     const upholstery = new THREE.MeshPhysicalMaterial({ color: fabricColor, ...fabricTexture });
     applyLook(upholstery, look, fabricColor, whiteBase);
     upholstery.userData["baseColor"] = fabricColor;
+    upholstery.userData["normalSoften"] = look.normalSoften;
     const feet = new THREE.MeshPhysicalMaterial({
       color: selectedLeg.color,
       ...legTexture,
@@ -988,19 +1000,18 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       undersideColor.setRGB((rgb[0] ?? 0) / 255, (rgb[1] ?? 0) / 255, (rgb[2] ?? 0) / 255, THREE.SRGBColorSpace);
     }
     upholstery.userData["undersideColor"] = undersideColor;
-    projectSurface(upholstery, leather ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale), scale, patternTexture, tileDensity(textureScale), selectedFabric.tufted ?? false, undersideColor, Boolean(selectedFabric.photo));
+    projectSurface(upholstery, leather ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale), scale, patternTexture, tileDensity(textureScale), selectedFabric.tufted ?? false, undersideColor, Boolean(selectedFabric.photo), look.normalSoften, Boolean(selectedFabric.directional));
     projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
-  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture, leather, look, whiteBase]);
+  }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture, leather]);
   const chairMaterials = useMemo(() => materials.map((material, i) => {
     const clone = material.clone();
     const lining = material.userData["undersideColor"];
-    projectSurface(clone, i === 0 ? selectedFabric.weave === "leather" ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale) : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null, tileDensity(textureScale), i === 0 && Boolean(selectedFabric.tufted), i === 0 && lining instanceof THREE.Color ? lining : null, i === 0 && Boolean(selectedFabric.photo));
+    const soften = i === 0 ? Number(material.userData["normalSoften"] ?? 0) : 0;
+    projectSurface(clone, i === 0 ? selectedFabric.weave === "leather" ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale) : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null, tileDensity(textureScale), i === 0 && Boolean(selectedFabric.tufted), i === 0 && lining instanceof THREE.Color ? lining : null, i === 0 && Boolean(selectedFabric.photo), soften, i === 0 && Boolean(selectedFabric.directional));
     return clone;
   }), [materials, textureScale, leg, scale, patternTexture, selectedFabric]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);
-  // Dev-only live look tuning; edits the upholstery materials without shader recompiles.
-  useLookTuner(selectedFabric.id, look, whiteBase, useMemo(() => [materials[0], chairMaterials[0]].filter((m): m is THREE.MeshPhysicalMaterial => Boolean(m)), [materials, chairMaterials]));
   useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
   useEffect(() => {
     for (const material of [...materials, ...chairMaterials]) material.wireframe = wireframe;
@@ -1146,7 +1157,7 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       shadows
       dpr={[1, 1.75]}
       camera={{ position: VIEWS.perspective, fov: 40, near: 0.1, far: 100 }}
-      gl={{ antialias: true, preserveDrawingBuffer: true, toneMapping: THREE.NeutralToneMapping, toneMappingExposure: 1, outputColorSpace: THREE.SRGBColorSpace }}
+      gl={{ antialias: true, preserveDrawingBuffer: true, toneMapping: THREE.NeutralToneMapping, toneMappingExposure: LIGHTING.exposure, outputColorSpace: THREE.SRGBColorSpace }}
       onCreated={({ gl, camera }) => { gl.domElement.dataset["viewerCanvas"] = "true"; camera.layers.enable(1); }}
     >
       <color attach="background" args={[studio ? "#ebe9e4" : "#d9ded8"]} />
@@ -1212,12 +1223,6 @@ export function SofaConfigurator() {
   const [view, setView] = useState<ViewName>("perspective");
   const [zoomSignal, setZoomSignal] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
-  const reset = useCallback(() => {
-    setSeats(2); setFabric("oat"); setLeg("oak"); setTextureScale(DEFAULT_TILE_CM); setScale(1); setGrid(true); setMeasures(true); setRotate(false); setStudio(true); setWireframe(false); setUnit("cm"); setView("perspective");
-  }, []);
-  const resetMaterialSettings = useCallback(() => {
-    setTextureScale(DEFAULT_TILE_CM); setScale(1); setUnit("cm"); setView("perspective"); setWireframe(false); setRotate(false); resetLookTuner();
-  }, []);
   const screenshot = () => {
     const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-viewer-canvas='true']");
     if (!canvas) return;
@@ -1237,7 +1242,6 @@ export function SofaConfigurator() {
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
-      <DevPanel />
       <div className="absolute inset-0 sm:right-[var(--panel-width)]"><Viewer fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} grid={grid} measures={measures} unit={unit} rotate={rotate} studio={studio} view={view} zoomSignal={zoomSignal} seats={seats} reducedMotion={reducedMotion} wireframe={wireframe} />{measures && (["width", "height", "depth"] as const).map((axis) => <span key={axis} data-dimension={axis} className="pointer-events-none absolute left-0 top-0 z-10 whitespace-nowrap rounded-sm bg-dimension px-1.5 py-0.5 font-mono text-[11px] text-dimension-foreground" />)}</div>
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between border-b border-border/60 bg-surface px-4 sm:px-6">
         <div className="pointer-events-auto flex items-center gap-3">
@@ -1246,7 +1250,6 @@ export function SofaConfigurator() {
         </div>
         <div className="hidden text-center md:block"><div className="text-xs font-semibold">Panache OPAA · {seats} seater</div><div className="mt-1 text-[10px] text-muted-foreground">{selectedFabric.name} · {selectedLeg.name}</div></div>
         <div className="pointer-events-auto flex items-center gap-2">
-          <Button variant="outline" size="icon-sm" onClick={reset} aria-label="Reset configuration" title="Reset configuration"><Undo2 className="size-4" /></Button>
           <Button variant="outline" size="icon-sm" onClick={screenshot} aria-label="Download image" title="Download image"><Download className="size-4" /></Button>
           <Button variant="outline" size="icon-sm" onClick={fullscreen} aria-label="Fullscreen" title="Fullscreen"><Expand className="size-4" /></Button>
         </div>
@@ -1277,7 +1280,7 @@ export function SofaConfigurator() {
           <span className="text-sm font-semibold">Configure sofa · {seats} seater</span><ChevronDown className={cn("size-4 transition-transform", panelOpen && "rotate-180")} />
         </Button>
         <div className="configuration-scroll h-[calc(100%_-_3.25rem)] overflow-y-auto px-4 pb-24 pt-5 sm:h-full sm:pb-6">
-          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-1 font-display text-xl font-semibold leading-tight">Make it yours</h1></div><Button variant="outline" size="sm" type="button" onClick={resetMaterialSettings} className="h-8 gap-1.5 px-2.5 text-[11px] font-semibold" aria-label="Reset material settings to defaults" title="Reset the current material's look, tile size, scale, units and view"><Undo2 className="size-3.5" /> Reset</Button></div>
+          <div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-1 font-display text-xl font-semibold leading-tight">Make it yours</h1></div>
           <section className="mt-4" aria-labelledby="seating-heading">
             <div className="flex items-center justify-between"><h2 id="seating-heading" className="text-[13px] font-semibold">Seating</h2><span className="text-[11px] text-muted-foreground">{seats} seater</span></div>
             <div className="mt-2 grid grid-cols-3 gap-1.5" role="group" aria-label="Seating options">
@@ -1302,7 +1305,7 @@ export function SofaConfigurator() {
               <p className="mb-1.5 text-[9px] font-semibold text-muted-foreground">{group.label}</p>
               <div className="grid grid-cols-6 gap-1.5">
               {group.items.map((item) => (
-                <Button variant="ghost" key={item.id} type="button" onClick={() => setFabric(item.id)} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-[70px] min-w-0 flex-col justify-start gap-1 rounded-sm border p-0.5 text-center", fabric === item.id ? "border-primary bg-accent/40 ring-1 ring-primary" : "border-transparent bg-surface")}>
+                <Button variant="ghost" key={item.id} type="button" onClick={() => { setFabric(item.id); setTextureScale(tileFor(item.id, DEFAULT_TILE_CM)); }} aria-label={`Select ${item.name}`} aria-pressed={fabric === item.id} className={cn("relative h-[70px] min-w-0 flex-col justify-start gap-1 rounded-sm border p-0.5 text-center", fabric === item.id ? "border-primary bg-accent/40 ring-1 ring-primary" : "border-transparent bg-surface")}>
                    <FabricSwatch fabric={item} />
                    <span className={cn("w-full whitespace-normal leading-[11px]", item.tufted ? "text-[7px]" : "text-[8px]", fabric === item.id ? "font-semibold text-foreground" : "text-muted-foreground")}>{item.name}</span>
                   {fabric === item.id && <span className="absolute right-1 top-1 flex size-3 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-2" /></span>}
