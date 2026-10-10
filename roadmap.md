@@ -97,4 +97,4 @@
 - [x] Verify Neutral/exposure/light settings in Viewer, successful live Ink Velvet/Wisdom switching with no runtime errors, and update the architecture guide.
 ## Per-fabric looks
 - [x] Add resolveLook/applyLook with per-fabric overrides, colour-faithful sheen, and retained relief; remove the inline tweed override.
-- [ ] Test looks, verify sofa/chair finishes in the viewer, and update architecture documentation.
+- [x] Pass eight material tests; verify Ink Velvet, Wisdom, Swatch Urban and Saddle Chesterfield on all three sizes without runtime errors; update architecture documentation.
