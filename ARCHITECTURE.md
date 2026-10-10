@@ -86,33 +86,33 @@ vite.config.ts             strip-r3f-tsd-source plugin
 | 43–49 | types | `FabricId`, `PatternKind`, `FabricPreset`, `LegId`, `Unit`, `ViewName`, `SeatCount` |
 | 51–61 | `useReducedMotion` | Reads `prefers-reduced-motion`; disables animations |
 | 63–67 | constants | `MODULE_WIDTH 0.7`, `INCH_METERS`, `seatingWidth()`, `BASE_SIZE` |
-| 68–83 | `FABRICS` | 14 presets |
-| 84–89 | `LEGS` | 4 leg finishes |
-| 90–95 | `VIEWS` | camera positions for presets |
+| 69–85 | `FABRICS` | 14 presets |
+| 86–91 | `LEGS` | 4 leg finishes |
+| 92–97 | `VIEWS` | camera positions for presets |
 | 99–104 | `formatDimension` | meters → "x cm/mm/in" |
-| 106–164 | `createSurfaceMaps` | procedural colour/bump/roughness DataTextures |
-| 166–208 | `createPhotoSurfaceMaps` | Wisdom photo → seamless maps |
-| 210–247 | `createPatternCanvas` | 1024px pattern artwork |
-| 249–276 | `FabricSwatch` | sidebar swatch preview |
-| 278–279 | `weaveDensity`, `leatherDensity` | aliases of `tileDensity` |
-| 286–309 | `tuftProfileGLSL` | GLSL Chesterfield profile + panel UV functions |
-| 311–463 | `projectSurface` | shader injection for all materials |
-| 465–582 | `splitSofaGeometry` | separates legs from fabric, prepares attributes |
-| 584–643 | `tuftPanelFrame` | smoothed panel direction + tuft mask per vertex |
-| 645–705 | `sliceModule` | exact clipping of geometry between two X planes |
-| 707–730 | `reflectedGeometry` | mirror in X and fix winding |
-| 732–751 | `softenMirrorPlane` | smooth normals at a mirror seam |
-| 753–758 | `joinedModule` | 3-seater middle insert |
-| 760–978 | `SofaModel` | builds modules, materials, animation, renders meshes |
-| 980–995 | `DimensionLabel` | projects HTML label to screen |
-| 997–1033 | `Dimensions` | ruler lines + labels |
-| 1035–1071 | `CameraRig` | view presets, fit distance, button zoom |
-| 1073–1091 | `SofaContactShadows` | delayed one-shot contact shadow |
-| 1093–1148 | `Viewer` | Canvas, lights, floor, grid, controls |
-| 1150–1156 | `ToolButton` | toolbar icon button |
-| 1158–1293 | `SofaConfigurator` | state + full UI layout |
-| 1295–1297 | `Metric` | dimension card |
-| 1299 | `useGLTF.preload` | starts model download early |
+| 107–165 | `createSurfaceMaps` | procedural colour/bump/roughness DataTextures |
+| 167–229 | `createPhotoSurfaceMaps` | client photo → seamless maps (+ tweed crosshatch) |
+| 231–268 | `createPatternCanvas` | 1024px pattern artwork |
+| 270–297 | `FabricSwatch` | sidebar swatch preview |
+| 299–300 | `weaveDensity`, `leatherDensity` | aliases of `tileDensity` |
+| 307–330 | `tuftProfileGLSL` | GLSL Chesterfield profile + panel UV functions |
+| 332–484 | `projectSurface` | shader injection for all materials |
+| 486–603 | `splitSofaGeometry` | separates legs from fabric, prepares attributes |
+| 605–664 | `tuftPanelFrame` | smoothed panel direction + tuft mask per vertex |
+| 666–726 | `sliceModule` | exact clipping of geometry between two X planes |
+| 728–751 | `reflectedGeometry` | mirror in X and fix winding |
+| 753–772 | `softenMirrorPlane` | smooth normals at a mirror seam |
+| 774–779 | `joinedModule` | 3-seater middle insert |
+| 781–1000 | `SofaModel` | builds modules, materials, animation, renders meshes |
+| 1002–1017 | `DimensionLabel` | projects HTML label to screen |
+| 1019–1055 | `Dimensions` | ruler lines + labels |
+| 1057–1093 | `CameraRig` | view presets, fit distance, button zoom |
+| 1095–1113 | `SofaContactShadows` | delayed one-shot contact shadow |
+| 1115–1170 | `Viewer` | Canvas, lights, floor, grid, controls |
+| 1172–1178 | `ToolButton` | toolbar icon button |
+| 1180–1315 | `SofaConfigurator` | state + full UI layout |
+| 1317–1319 | `Metric` | dimension card |
+| 1321 | `useGLTF.preload` | starts model download early |
 
 ---
 
