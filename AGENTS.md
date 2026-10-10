@@ -10,7 +10,7 @@
 <!-- LOVABLE:END -->
 
 - Keep the 3D configurator client-only and isolate all Three.js scene logic in `SofaConfigurator.tsx` because WebGL cannot render during SSR.
-- Keep tested family defaults in `material-recipes.ts` and upholstery overrides in `material-looks.ts`; apply looks before shader injection and chair cloning so tuning preserves maps, tufting and seating consistency. Dev-only live tuning lives in `src/lib/dev-tuning.tsx` (leva): `LightRig` is the Viewer lights block, `useLookTuner` runs after `chairMaterials`, `<DevPanel />` renders once in SofaConfigurator.
+- Keep tested family defaults in `material-recipes.ts` and fixed upholstery, lighting and relief presets in `material-looks.ts`; apply looks before shader injection and chair cloning to preserve maps, tufting and seating consistency. `static-light-rig.tsx` supplies fixed Viewer lights using createElement to avoid devtools dashed-prop injection into R3F.
 - Use broad targeted rectangular environment lights and finite contact-shadow captures after size transitions settle; recapture on seating/scale changes and exclude floor/grid via camera layers so the sofa is grounded without shadow passes during orbit or baking the floor into a dark overlay.
 - Treat the uploaded sofa as one mesh and separate leg faces spatially (full tapered cone around each detected leg axis, up to the base underside) into a second material group because the source GLB has only one unnamed material.
 - Derive seating variants from fixed end caps and clipped central modules; build the inserted cushion from reflected crown halves with exact original centre-profile ends, corrected winding, and smooth mirror-plane normals so joins stay closed without nearest-profile distortion.

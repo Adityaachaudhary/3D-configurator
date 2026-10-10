@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { Color, MeshPhysicalMaterial } from "three";
-import { applyLook, resolveLook } from "../lib/material-looks";
+import { applyLook, resolveLook, tileFor, LIGHTING, RELIEF } from "../lib/material-looks";
 
 describe("per-fabric material looks", () => {
+  it("uses the existing tile size when a fabric has no supplied tile override", () => {
+    expect(tileFor("orange-pattern", 12.5)).toBe(12.5);
+    expect(tileFor("unknown", 7)).toBe(7);
+  });
+  it("preserves fixed product exposure", () => {
+    expect(LIGHTING.exposure).toBe(1);
+  });
+  it("preserves the fixed Chesterfield relief constants", () => {
+    expect(RELIEF.recess).toBe(0.0015);
+    expect(RELIEF.normalHeight).toBe(0.042);
+    expect(RELIEF.grainNormal).toBe(0.00045);
+    expect(RELIEF.seamShadeMin + RELIEF.seamShadeRange).toBe(1);
+  });
   it("keeps Ink Velvet sheen nearly base-coloured with only a small linear lerp toward white", () => {
     const base = new Color("#34383b");
     const material = new MeshPhysicalMaterial();

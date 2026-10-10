@@ -1,8 +1,16 @@
 import * as THREE from "three";
 
 // One "look" = every number that decides how a fabric reacts to light.
-// Prototype: hardcoded below. Real configurator: the SAME fields become columns
-// on the dashboard's materials table, edited with a live preview.
+// Fixed presets shared by the configurator and its static light rig.
+
+export const LIGHTING = { exposure: 1, ambient: 0.15, directional: 0.6, environment: 1, key: 2.2, fill: 1, rim: 0.85 } as const;
+export const RELIEF = { recess: 0.0015, seamShadeMin: 0.74, seamShadeRange: 0.26, normalHeight: 0.042, grainNormal: 0.00045 } as const;
+
+// Preserve the existing tile size and shading until an explicit fabric override is supplied.
+const TILES: Readonly<Record<string, number>> = {};
+export function tileFor(id: string, fallback: number): number {
+  return TILES[id] ?? fallback;
+}
 
 export type LookFamily = "woven" | "velvet" | "leather";
 /** Backwards-compatible alias for the configurator imports. */
@@ -28,22 +36,23 @@ export type MaterialLook = {
   clearcoatRoughness: number;
   specularIntensity: number;
   bumpScale: number;
+  normalSoften: number;
 };
 
 const DEFAULTS: Record<LookFamily, MaterialLook> = {
   woven: {
     roughness: 0.96, sheen: 0.35, sheenRoughness: 0.55, sheenTint: 0.12, sheenGrey: 0.25,
-    clearcoat: 0, clearcoatRoughness: 0.35, specularIntensity: 1, bumpScale: 0.00009,
+    clearcoat: 0, clearcoatRoughness: 0.35, specularIntensity: 1, bumpScale: 0.00009, normalSoften: 0,
   },
   velvet: {
     roughness: 0.9, sheen: 0.8, sheenRoughness: 0.35, sheenTint: 0.05, sheenGrey: 0.25,
-    clearcoat: 0, clearcoatRoughness: 0.35, specularIntensity: 1, bumpScale: 0.00004,
+    clearcoat: 0, clearcoatRoughness: 0.35, specularIntensity: 1, bumpScale: 0.00004, normalSoften: 0,
   },
   leather: {
     // bumpScale is for the new Voronoi grain (3 mm cells). The old sine grain
     // used 0.00045; the new one is much steeper per unit height, so start low.
     roughness: 0.56, sheen: 0, sheenRoughness: 0.5, sheenTint: 0, sheenGrey: 0.25,
-    clearcoat: 0.05, clearcoatRoughness: 0.4, specularIntensity: 0.55, bumpScale: 0.0001,
+    clearcoat: 0.05, clearcoatRoughness: 0.4, specularIntensity: 0.55, bumpScale: 0.0001, normalSoften: 0,
   },
 };
 
@@ -51,7 +60,7 @@ const DEFAULTS: Record<LookFamily, MaterialLook> = {
 // normals but is kept for the swatch/grain path.
 const TUFTED: Partial<MaterialLook> = { clearcoat: 0.04, bumpScale: 0.024 };
 
-// Starting points, tune by eye with the live panel (dev-tuning.tsx).
+// Fixed photo and pattern presets.
 const PATTERN: Partial<MaterialLook> = { sheen: 0.2, sheenRoughness: 0.6, sheenGrey: 0.25 };
 
 const OVERRIDES: Record<string, Partial<MaterialLook>> = {
@@ -83,7 +92,7 @@ export function resolveLook(id: string, family: LookFamily, tufted = false): Mat
 
 const WHITE = new THREE.Color(1, 1, 1);
 
-/** Applies a look to an upholstery material. Safe to call repeatedly (live tuning). */
+/** Applies a fixed look without replacing textures or shader hooks. */
 export function applyLook(
   material: THREE.MeshPhysicalMaterial,
   look: MaterialLook,
