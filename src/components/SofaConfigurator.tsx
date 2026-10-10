@@ -117,6 +117,7 @@ function createSurfaceMaps(kind: string) {
       if (kind === "wood") height = 0.5 + 0.28 * Math.sin(u * 18 + 1.6 * Math.sin(v * 2) + 0.5 * Math.sin(v * 5)) + noise * 0.06;
       else if (kind === "steel") height = 0.5 + 0.2 * Math.sin(u * 95) + noise * 0.05;
       else if (kind === "loop") height = 0.5 + 0.23 * Math.sin(u * 9 + Math.sin(v * 11)) * Math.cos(v * 11 + Math.sin(u * 9)) + noise * 0.1;
+      else if (kind === "boucle") height = grainB?.[y * size + x] ?? 0.5;
       else if (kind === "velvet") height = 0.5 + noise * 0.12;
       else if (kind === "leather") height = 0.15 + 0.7 * (grain?.[y * size + x] ?? 0.5);
       else if (kind === "tuft") {
