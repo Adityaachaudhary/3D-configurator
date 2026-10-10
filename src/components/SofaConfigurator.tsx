@@ -1277,7 +1277,7 @@ export function SofaConfigurator() {
           <span className="text-sm font-semibold">Configure sofa · {seats} seater</span><ChevronDown className={cn("size-4 transition-transform", panelOpen && "rotate-180")} />
         </Button>
         <div className="configuration-scroll h-[calc(100%_-_3.25rem)] overflow-y-auto px-4 pb-24 pt-5 sm:h-full sm:pb-6">
-          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-1 font-display text-xl font-semibold leading-tight">Make it yours</h1></div><Move3D className="size-4 text-muted-foreground" /></div>
+          <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase text-muted-foreground">01 / Configuration</div><h1 className="mt-1 font-display text-xl font-semibold leading-tight">Make it yours</h1></div><Button variant="outline" size="sm" type="button" onClick={resetMaterialSettings} className="h-8 gap-1.5 px-2.5 text-[11px] font-semibold" aria-label="Reset material settings to defaults" title="Reset tile size, scale, units and view for the current material"><Undo2 className="size-3.5" /> Reset</Button></div>
           <section className="mt-4" aria-labelledby="seating-heading">
             <div className="flex items-center justify-between"><h2 id="seating-heading" className="text-[13px] font-semibold">Seating</h2><span className="text-[11px] text-muted-foreground">{seats} seater</span></div>
             <div className="mt-2 grid grid-cols-3 gap-1.5" role="group" aria-label="Seating options">
@@ -1330,10 +1330,6 @@ export function SofaConfigurator() {
             <label className="mt-3 block"><span className="flex items-center justify-between text-[11px]"><span className="font-medium">Model scale</span><span className="font-mono text-muted-foreground">{Math.round(scale * 100)}%</span></span><input className="mt-2 w-full accent-primary" type="range" min="0.8" max="1.2" step="0.01" value={scale} onChange={(event) => setScale(Number(event.target.value))} /></label>
             <div className="mt-3 grid grid-cols-3 gap-1.5 text-center"><Metric label="Width" value={seatingWidth(seats) * scale} unit={unit} /><Metric label="Height" value={BASE_SIZE.height * scale} unit={unit} /><Metric label="Depth" value={BASE_SIZE.depth * scale} unit={unit} /></div>
           </section>
-          <div className="my-4 h-px bg-border" />
-          <Button variant="outline" type="button" onClick={resetMaterialSettings} className="h-9 w-full gap-2 text-[12px] font-semibold" aria-label="Reset material settings to defaults" title="Reset tile size, scale, units and view for the current material">
-            <Undo2 className="size-3.5" /> Reset material settings
-          </Button>
         </div>
       </aside>
       <div className="pointer-events-none absolute bottom-20 left-3 hidden items-center gap-2 rounded-md bg-surface/85 px-3 py-2 text-[10px] font-medium text-muted-foreground shadow-sm lg:flex"><Maximize2 className="size-3" /> Drag to orbit · scroll or pinch to zoom · right-drag to pan</div>
