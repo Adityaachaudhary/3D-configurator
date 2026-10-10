@@ -1,6 +1,6 @@
 # Panache Sofa Configurator — Codebase Guide
 
-Written after reading every line of `src/components/SofaConfigurator.tsx` (1,321 lines), the routes, the `lib` modules, the tests, the optimizer script, `vite.config.ts`, `styles.css` and `AGENTS.md`. Line numbers refer to `SofaConfigurator.tsx` at the time of writing.
+Written after reading every line of the configurator, routes, `lib` modules, tests, optimizer script, `vite.config.ts`, `styles.css` and `AGENTS.md`; updated for the real leather grain patch. The symbol map below is the navigation reference; line numbers are approximate and shift with edits.
 
 Read in this order: this file → `AGENTS.md` (binding architecture rules) → `roadmap.md` (task history).
 
@@ -55,6 +55,7 @@ src/
   lib/
     material-recipes.ts  materialRecipe(family, tufted) – physical parameters
     material-looks.ts    resolveLook(id, family, tufted), OVERRIDES, applyLook – per-fabric upholstery looks
+    leather-grain.ts     leatherHeightField(size) – deterministic seamless 40-cell leather grain
     texture-repeat.ts    DEFAULT/MIN/MAX_TILE_CM, tileDensity(cm)
     utils.ts             cn()
   assets/
@@ -68,6 +69,7 @@ src/
   test/
     material-recipes.test.ts   recipe ranges per family
     material-looks.test.ts     dark velvet/photo sheen, tweed override, relief and clone preservation
+    leather-grain.test.ts      512px bounded grain, deterministic output, seamless edge variation
     texture-repeat.test.ts     cm → tiles/m conversion and clamping
     sofa-optimization.test.ts  20 % reduction + protected vertices
     app-routing.test.tsx       route smoke test
@@ -92,10 +94,10 @@ vite.config.ts             strip-r3f-tsd-source plugin
 | 87–92 | `LEGS` | 4 leg finishes |
 | 93–98 | `VIEWS` | camera positions for presets |
 | 100–105 | `formatDimension` | meters → "x cm/mm/in" |
-| 108–166 | `createSurfaceMaps` | procedural colour/bump/roughness DataTextures |
+| 109–166 | `createSurfaceMaps` | procedural colour/bump/roughness DataTextures (256px, leather 512px, tuft 2048px) |
 | 168–230 | `createPhotoSurfaceMaps` | client photo → seamless maps (+ tweed crosshatch) |
 | 232–269 | `createPatternCanvas` | 1024px pattern artwork |
-| 271–298 | `FabricSwatch` | sidebar swatch preview |
+| 273–300 | `FabricSwatch` | sidebar swatch preview with source-width row stride |
 | 300–301 | `weaveDensity`, `leatherDensity` | aliases of `tileDensity` |
 | 308–331 | `tuftProfileGLSL` | GLSL Chesterfield profile + panel UV functions |
 | 333–485 | `projectSurface` | shader injection for all materials |
@@ -230,10 +232,10 @@ Each frame, the whole assembly is scaled from the **real source bounds** so its 
 1. **Colour**: read `--fabric-<id>` by painting a 1×1 canvas and reading the pixel (converts oklch to RGB), interpreted as sRGB. Patterns use the fallback (white); photo = white.
 2. **Upholstery** = `MeshPhysicalMaterial`:
    - `...fabricTexture` (map, bumpMap, roughnessMap)
-   - `bumpScale`: tufted 0.024, tweed 0.0011, leather 0.00045, loop 0.00018, velvet 0.00004, other 0.00009
+    - `bumpScale`: tufted 0.024, tweed 0.0011, leather 0.0001, loop 0.00018, velvet 0.00004, other 0.00009
     - `resolveLook(id, family, tufted)` merges family defaults with `OVERRIDES` from `material-looks.ts`; `applyLook` applies the result after constructing the material with its colour/maps. The old inline tweed override is removed.
     - Solid sheen preserves base hue by multiplying linear base RGB by `sheenTint` (default 1.25, Ink Velvet 1.1), never lerping toward linear white. Photo/pattern white-base materials use an explicitly sRGB-decoded `sheenGrey` (Wisdom/Red Fish/Orange Pattern 0.2, Ochre Chevron 0.22, Swatch Urban 0.24). These starting tuning values prevent the old white/grey veil.
-    - Swatch Urban override keeps roughness 1, sheen 0.5, sheenRoughness 0.62 and bumpScale 0.0011. Oat/Forest retain loop relief 0.00018; leather and Chesterfield relief remain unchanged.
+    - Swatch Urban override keeps roughness 1, sheen 0.5, sheenRoughness 0.62 and bumpScale 0.0011. Oat/Forest retain loop relief 0.00018; ordinary leather starts at 0.0001 for its steeper cellular grain, while Chesterfield tuft relief remains unchanged.
     - `upholstery.userData["baseColor"]` stores the untampered base colour. `applyLook` leaves maps and shader hooks alone; `projectSurface` is still installed afterwards. No optional live tuner or DevPanel is mounted.
 3. **Legs** = `MeshPhysicalMaterial`: leg colour, `...legTexture` (wood or steel maps), bumpScale steel 0.000008 / wood 0.000025, `...materialRecipe("steel" | "wood")`.
 4. **Underside lining colour** from `--fabric-underside`.
@@ -258,13 +260,16 @@ Base: metalness 0, sheen 0, sheenRoughness 0.5, clearcoat 0, clearcoatRoughness 
 
 | Function | Output |
 |---|---|
-| `createSurfaceMaps(kind)` | 256px (2048px for `"tuft"`) seamless `DataTexture`s: `map` (neutral near-white microstructure, sRGB), `bumpMap` (height), `roughnessMap` (0.88–1.0). Kinds: wood (grain sines), steel (brushed lines), loop, velvet (fine noise), leather (pebble grain), tuft (diamond), default linen/twill (warp/weft). All values clamped (Uint8 overflow made black spots). The colour map is neutral so the fabric colour isn't multiplied twice. |
+| `createSurfaceMaps(kind)` | 256px, **512px for leather**, 2048px for `"tuft"`: seamless `DataTexture`s for `map` (neutral near-white, sRGB), `bumpMap` (height) and `roughnessMap` (linear data). Leather calls `leatherHeightField(size)` and uses `height = 0.15 + 0.7 * grain`, colour contrast 0.2, and roughness `0.78 + (1 - height) * 0.22` (creases rougher, dome tops smoother). Other kinds retain roughness `0.88 + height * 0.12`: wood (grain sines), steel (brushed lines), loop, velvet (fine noise), tuft (diamond), default linen/twill (warp/weft). Bytes are clamped to prevent overflow; neutral colour avoids multiplying the fabric colour twice. |
+| `leatherHeightField(size)` | Pure `Float32Array` generator: periodic jittered Voronoi sites, nearest/second-nearest distances forming rounded pebbles with steep narrow creases, per-cell height variation and restrained periodic pore noise. Forty cells across a tile gives approximately 3.125mm grain at the default 12.5cm tile. Shared grain drives colour, bump and roughness; no texture downloads or true normal/AO maps. All five leather finishes, including Chesterfields, use these 512px model maps; Chesterfield's 2048px diamond map remains swatch-only and model tufting remains analytic. |
 | `createPhotoSurfaceMaps(img, cropPixels?, reliefStrength = 0.45)` | Central square crop of the photo drawn 4× mirrored into a 1024px canvas (seamless, no stretching). Red Fish uses a 128px source crop so its many tiny motifs remain visible at the default physical tile size; Wisdom, Swatch Urban and Orange Pattern use the largest square crop. bump = luminance scaled by `reliefStrength`; roughness inverse to height. When `reliefStrength > 0.6` (Swatch Urban tweed passes 1.1), a synthetic woven crosshatch is added on top of the photo relief: 48 rounded warp/weft yarns per tile with a broken-twill interlace and slub speckle, thread gaps darken the photo colour slightly, and roughness gaps stay flatter — so the weave reads as real threads, not a flat print. |
 | `createPatternCanvas(fabric)` | 1024px pattern from 3 token colours, with a faint 3 % thread modulation. check/chevron/diamond formulas. The stripe formula was removed with Ocean Stripe and Graphite Stripe; diamond has no remaining preset since Teal Diamond was replaced by Orange Pattern. |
 | `patternTexture` | `CanvasTexture` of that canvas (sRGB, repeat). |
-| `FabricSwatch` | 192px canvas: procedural patterns tiled 3×3; plain/leather = token colour × `createSurfaceMaps` colour (tuft map for Chesterfield). Wisdom, Swatch Urban, Red Fish and Orange Pattern show their original photo `<img>` with the selected fabric's accessible name. |
+| `FabricSwatch` | 192px canvas: procedural patterns tiled 3×3; plain/leather = token colour × `createSurfaceMaps` colour (tuft map for Chesterfield). Pixel rows use `maps.map.image.width`, not a fixed 256px stride, so 512px leather and 2048px tuft sources sample correctly. Wisdom, Swatch Urban, Red Fish and Orange Pattern show their original photo `<img>` with the selected fabric's accessible name. |
 
 **Texture settings effect** (lines 902–914): colour maps & pattern → `SRGBColorSpace`; bump/roughness → `NoColorSpace`; `anisotropy = gl.capabilities.getMaxAnisotropy()`; mipmaps; `LinearMipmapLinearFilter` / `LinearFilter`.
+
+Leather's material roughness remains 0.58 from the physical family recipe; the height-dependent roughness **map multiplies** that value rather than replacing it. The tile slider controls the shared physical density on sofa modules and chair clones; the new grain does not alter geometry or tuft diamond size. No live tuning panel is currently installed—adjust starting strengths in `material-looks.ts`.
 
 ---
 
@@ -368,6 +373,7 @@ bunx vitest run
 | Add a leg finish | `LegId`, `LEGS`, `--leg-<id>`, `.leg-swatch` rule |
 | Roughness / sheen / clearcoat | `src/lib/material-looks.ts` per-fabric overrides + tests; `material-recipes.ts` family defaults/legs |
 | Upholstery bump strength | `resolveLook` defaults / `OVERRIDES` in `src/lib/material-looks.ts` |
+| Leather pebble shape / density | `src/lib/leather-grain.ts`; map resolution, contrast and height-to-roughness in `createSurfaceMaps` |
 | Tile range | `src/lib/texture-repeat.ts` + its test |
 | Dimensions | `seatingWidth`, `BASE_SIZE` |
 | Lighting / exposure | `Viewer` |

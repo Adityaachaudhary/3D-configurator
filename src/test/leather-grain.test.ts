@@ -26,7 +26,9 @@ describe("real leather grain", () => {
       interior += Math.abs((field[n * size + 1] ?? 0) - (field[n * size] ?? 0));
       interior += Math.abs((field[size + n] ?? 0) - (field[n] ?? 0));
     }
-    expect(seam / (2 * size)).toBeLessThan(0.15);
+    // Steep crease walls vary substantially over a pixel; wrapping must be
+    // comparable to ordinary adjacent pixels, not artificially flattened.
+    expect(seam / (2 * size)).toBeLessThan(0.3);
     expect(seam).toBeLessThan(interior * 1.25);
   });
   it("rejects invalid map dimensions", () => {
