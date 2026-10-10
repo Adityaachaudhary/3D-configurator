@@ -1,6 +1,6 @@
 # Panache Sofa Configurator — Codebase Guide
 
-Written after reading every line of `src/components/SofaConfigurator.tsx` (1,302 lines), the routes, the `lib` modules, the tests, the optimizer script, `vite.config.ts`, `styles.css` and `AGENTS.md`. Line numbers refer to `SofaConfigurator.tsx` at the time of writing.
+Written after reading every line of `src/components/SofaConfigurator.tsx` (1,321 lines), the routes, the `lib` modules, the tests, the optimizer script, `vite.config.ts`, `styles.css` and `AGENTS.md`. Line numbers refer to `SofaConfigurator.tsx` at the time of writing.
 
 Read in this order: this file → `AGENTS.md` (binding architecture rules) → `roadmap.md` (task history).
 
@@ -13,7 +13,7 @@ A full-screen browser 3D configurator for one supplied sofa model (Panache OPAA,
 | Feature | Details |
 |---|---|
 | Seating | 1, 2 or 3 seater, animated transitions, all derived from the one 2-seater mesh |
-| Upholstery | 14 finishes: Solids (5, including client photo fabric "Wisdom"), Patterns (4), Leather & Chesterfield (3 + 2) |
+| Upholstery | 14 finishes: Solids (5, including client photo fabric "Wisdom"), Patterns (4, three of them client photos), Leather & Chesterfield (3 + 2) |
 | Legs | Natural oak, Dark walnut, Ebonized wood, Brushed steel |
 | Texture tile | Slider 5–25 cm per tile (step 0.5, default 12.5). Label switches between "Grain tile" / "Pattern tile" / "Weave tile" |
 | Size | Model scale 80–120 %, exact inch size chart, units cm / mm / in |
@@ -63,6 +63,7 @@ src/
     wisdom-fabric.png.asset.json       client fabric photo pointer
     red-fish-fabric.png.asset.json     uploaded Red Fish print, replacing Rose Check
     orange-pattern-fabric.png.asset.json  uploaded Orange Pattern stripe, replacing Teal Diamond
+    swatch-urban-fabric.png.asset.json    uploaded Swatch Urban tweed, replacing Olive Check
   test/
     material-recipes.test.ts   recipe ranges per family
     texture-repeat.test.ts     cm → tiles/m conversion and clamping
@@ -85,33 +86,33 @@ vite.config.ts             strip-r3f-tsd-source plugin
 | 43–49 | types | `FabricId`, `PatternKind`, `FabricPreset`, `LegId`, `Unit`, `ViewName`, `SeatCount` |
 | 51–61 | `useReducedMotion` | Reads `prefers-reduced-motion`; disables animations |
 | 63–67 | constants | `MODULE_WIDTH 0.7`, `INCH_METERS`, `seatingWidth()`, `BASE_SIZE` |
-| 68–83 | `FABRICS` | 14 presets |
-| 84–89 | `LEGS` | 4 leg finishes |
-| 90–95 | `VIEWS` | camera positions for presets |
+| 69–85 | `FABRICS` | 14 presets |
+| 86–91 | `LEGS` | 4 leg finishes |
+| 92–97 | `VIEWS` | camera positions for presets |
 | 99–104 | `formatDimension` | meters → "x cm/mm/in" |
-| 106–164 | `createSurfaceMaps` | procedural colour/bump/roughness DataTextures |
-| 166–208 | `createPhotoSurfaceMaps` | Wisdom photo → seamless maps |
-| 210–247 | `createPatternCanvas` | 1024px pattern artwork |
-| 249–276 | `FabricSwatch` | sidebar swatch preview |
-| 278–279 | `weaveDensity`, `leatherDensity` | aliases of `tileDensity` |
-| 286–309 | `tuftProfileGLSL` | GLSL Chesterfield profile + panel UV functions |
-| 311–463 | `projectSurface` | shader injection for all materials |
-| 465–582 | `splitSofaGeometry` | separates legs from fabric, prepares attributes |
-| 584–643 | `tuftPanelFrame` | smoothed panel direction + tuft mask per vertex |
-| 645–705 | `sliceModule` | exact clipping of geometry between two X planes |
-| 707–730 | `reflectedGeometry` | mirror in X and fix winding |
-| 732–751 | `softenMirrorPlane` | smooth normals at a mirror seam |
-| 753–758 | `joinedModule` | 3-seater middle insert |
-| 760–978 | `SofaModel` | builds modules, materials, animation, renders meshes |
-| 980–995 | `DimensionLabel` | projects HTML label to screen |
-| 997–1033 | `Dimensions` | ruler lines + labels |
-| 1035–1071 | `CameraRig` | view presets, fit distance, button zoom |
-| 1073–1091 | `SofaContactShadows` | delayed one-shot contact shadow |
-| 1093–1148 | `Viewer` | Canvas, lights, floor, grid, controls |
-| 1150–1156 | `ToolButton` | toolbar icon button |
-| 1158–1293 | `SofaConfigurator` | state + full UI layout |
-| 1295–1297 | `Metric` | dimension card |
-| 1299 | `useGLTF.preload` | starts model download early |
+| 107–165 | `createSurfaceMaps` | procedural colour/bump/roughness DataTextures |
+| 167–229 | `createPhotoSurfaceMaps` | client photo → seamless maps (+ tweed crosshatch) |
+| 231–268 | `createPatternCanvas` | 1024px pattern artwork |
+| 270–297 | `FabricSwatch` | sidebar swatch preview |
+| 299–300 | `weaveDensity`, `leatherDensity` | aliases of `tileDensity` |
+| 307–330 | `tuftProfileGLSL` | GLSL Chesterfield profile + panel UV functions |
+| 332–484 | `projectSurface` | shader injection for all materials |
+| 486–603 | `splitSofaGeometry` | separates legs from fabric, prepares attributes |
+| 605–664 | `tuftPanelFrame` | smoothed panel direction + tuft mask per vertex |
+| 666–726 | `sliceModule` | exact clipping of geometry between two X planes |
+| 728–751 | `reflectedGeometry` | mirror in X and fix winding |
+| 753–772 | `softenMirrorPlane` | smooth normals at a mirror seam |
+| 774–779 | `joinedModule` | 3-seater middle insert |
+| 781–1000 | `SofaModel` | builds modules, materials, animation, renders meshes |
+| 1002–1017 | `DimensionLabel` | projects HTML label to screen |
+| 1019–1055 | `Dimensions` | ruler lines + labels |
+| 1057–1093 | `CameraRig` | view presets, fit distance, button zoom |
+| 1095–1113 | `SofaContactShadows` | delayed one-shot contact shadow |
+| 1115–1170 | `Viewer` | Canvas, lights, floor, grid, controls |
+| 1172–1178 | `ToolButton` | toolbar icon button |
+| 1180–1315 | `SofaConfigurator` | state + full UI layout |
+| 1317–1319 | `Metric` | dimension card |
+| 1321 | `useGLTF.preload` | starts model download early |
 
 ---
 
@@ -123,11 +124,11 @@ vite.config.ts             strip-r3f-tsd-source plugin
 | Group | Fabrics | weave |
 |---|---|---|
 | Solids | Oat Bouclé (loop), Wisdom (linen + photo), Clay Twill (twill), Forest Chenille (loop), Ink Velvet (velvet) | as listed |
-| Patterns | Swatch Urban (linen); Ochre Chevron (twill); Red Fish, Orange Pattern (uploaded client photos) | procedural `pattern`, or `printed: true` + uploaded `photo` |
+| Patterns | Ochre Chevron (procedural `pattern`, twill); Swatch Urban, Red Fish, Orange Pattern (`printed: true` + uploaded `photo`) | as listed |
 | Leather | Cognac, Charcoal, Olive | leather |
 | Chesterfield | Oxblood, Saddle | leather + `tufted: true` |
 
-Colours: the `color` field is mostly a fallback. The real colour of solids/leathers comes from CSS token `--fabric-<id>`; procedural pattern colours from `--pattern-<id>-base/accent/detail`; Wisdom, Red Fish and Orange Pattern use white material tint so their photos show unaltered. The UI groups fabrics by filter: patterns = has `pattern` or `printed`, leather = `weave === "leather"`, solids = the rest. `useTexture(selectedFabric.photo ?? wisdomAsset.url)` loads the selected photograph; `createPhotoSurfaceMaps` derives matched colour, relief and roughness maps. Every photo fabric uses the same joined physical-coordinate projection and per-panel phases as Wisdom on the sofa and chair materials, without changing leg materials.
+Colours: the `color` field is mostly a fallback. The real colour of solids/leathers comes from CSS token `--fabric-<id>`; procedural pattern colours from `--pattern-<id>-base/accent/detail`; Wisdom, Swatch Urban, Red Fish and Orange Pattern use white material tint so their photos show unaltered. The UI groups fabrics by filter: patterns = has `pattern` or `printed`, leather = `weave === "leather"`, solids = the rest. `useTexture(selectedFabric.photo ?? wisdomAsset.url)` loads the selected photograph; `createPhotoSurfaceMaps` derives matched colour, relief and roughness maps. Every photo fabric uses the same joined physical-coordinate projection and per-panel phases as Wisdom on the sofa and chair materials, without changing leg materials.
 
 ### Legs (`LEGS`)
 `{ id, name, color, metalness, roughness }`. Only `color` is used by the material; physical values come from `materialRecipe("wood" | "steel")`. Sidebar swatch colour uses `.leg-swatch[data-leg]` → `--leg-*`.
@@ -226,9 +227,9 @@ Each frame, the whole assembly is scaled from the **real source bounds** so its 
 1. **Colour**: read `--fabric-<id>` by painting a 1×1 canvas and reading the pixel (converts oklch to RGB), interpreted as sRGB. Patterns use the fallback (white); photo = white.
 2. **Upholstery** = `MeshPhysicalMaterial`:
    - `...fabricTexture` (map, bumpMap, roughnessMap)
-   - `bumpScale`: tufted 0.024, leather 0.00045, loop 0.00018, velvet 0.00004, other 0.00009
-   - `...materialRecipe("leather" | "velvet" | "woven", tufted)`
-   - `sheenColor` = colour lerped 35 % to white
+   - `bumpScale`: tufted 0.024, tweed 0.0011, leather 0.00045, loop 0.00018, velvet 0.00004, other 0.00009
+   - `...materialRecipe("leather" | "velvet" | "woven", tufted)`; tweed overrides with roughness 1, sheen 0.5, sheenRoughness 0.62, sheenColor (0.66, 0.62, 0.56) — fully matte with a soft woolly glow
+   - `sheenColor` = colour lerped 35 % to white (except the tweed override)
 3. **Legs** = `MeshPhysicalMaterial`: leg colour, `...legTexture` (wood or steel maps), bumpScale steel 0.000008 / wood 0.000025, `...materialRecipe("steel" | "wood")`.
 4. **Underside lining colour** from `--fabric-underside`.
 5. `projectSurface(upholstery, tileDensity(cm), scale, patternTexture, tileDensity(cm), tufted, undersideColor, isPhoto)` and `projectSurface(legs, steel ? 3 : 1.6, scale)`.
@@ -253,10 +254,10 @@ Base: metalness 0, sheen 0, sheenRoughness 0.5, clearcoat 0, clearcoatRoughness 
 | Function | Output |
 |---|---|
 | `createSurfaceMaps(kind)` | 256px (2048px for `"tuft"`) seamless `DataTexture`s: `map` (neutral near-white microstructure, sRGB), `bumpMap` (height), `roughnessMap` (0.88–1.0). Kinds: wood (grain sines), steel (brushed lines), loop, velvet (fine noise), leather (pebble grain), tuft (diamond), default linen/twill (warp/weft). All values clamped (Uint8 overflow made black spots). The colour map is neutral so the fabric colour isn't multiplied twice. |
-| `createPhotoSurfaceMaps(img, cropPixels?)` | Central square crop of the photo drawn 4× mirrored into a 1024px canvas (seamless, no stretching). Red Fish uses a 128px source crop so its many tiny motifs remain visible at the default physical tile size; Wisdom and Orange Pattern use the largest square crop (Orange Pattern's source is 436×380, so its medium-scale stripes survive the upscale). bump = luminance with 0.45 contrast; roughness ≈ 0.96 inverse to height. |
+| `createPhotoSurfaceMaps(img, cropPixels?, reliefStrength = 0.45)` | Central square crop of the photo drawn 4× mirrored into a 1024px canvas (seamless, no stretching). Red Fish uses a 128px source crop so its many tiny motifs remain visible at the default physical tile size; Wisdom, Swatch Urban and Orange Pattern use the largest square crop. bump = luminance scaled by `reliefStrength`; roughness inverse to height. When `reliefStrength > 0.6` (Swatch Urban tweed passes 1.1), a synthetic woven crosshatch is added on top of the photo relief: 48 rounded warp/weft yarns per tile with a broken-twill interlace and slub speckle, thread gaps darken the photo colour slightly, and roughness gaps stay flatter — so the weave reads as real threads, not a flat print. |
 | `createPatternCanvas(fabric)` | 1024px pattern from 3 token colours, with a faint 3 % thread modulation. check/chevron/diamond formulas. The stripe formula was removed with Ocean Stripe and Graphite Stripe; diamond has no remaining preset since Teal Diamond was replaced by Orange Pattern. |
 | `patternTexture` | `CanvasTexture` of that canvas (sRGB, repeat). |
-| `FabricSwatch` | 192px canvas: procedural patterns tiled 3×3; plain/leather = token colour × `createSurfaceMaps` colour (tuft map for Chesterfield). Wisdom, Red Fish and Orange Pattern show their original photo `<img>` with the selected fabric's accessible name. |
+| `FabricSwatch` | 192px canvas: procedural patterns tiled 3×3; plain/leather = token colour × `createSurfaceMaps` colour (tuft map for Chesterfield). Wisdom, Swatch Urban, Red Fish and Orange Pattern show their original photo `<img>` with the selected fabric's accessible name. |
 
 **Texture settings effect** (lines 902–914): colour maps & pattern → `SRGBColorSpace`; bump/roughness → `NoColorSpace`; `anisotropy = gl.capabilities.getMaxAnisotropy()`; mipmaps; `LinearMipmapLinearFilter` / `LinearFilter`.
 
