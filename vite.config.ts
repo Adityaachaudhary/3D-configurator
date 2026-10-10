@@ -8,12 +8,13 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 // TanStack devtools injects `data-tsd-source` on every JSX element. React Three Fiber treats
 // dashed props as nested paths on three.js objects and throws when the value changes on HMR,
-// so strip the attribute from the client-only 3D scene module.
+// so strip the attribute from the client-only 3D scene module and the static light rig.
+const R3F_MODULE_MARKERS = ["SofaConfigurator", "static-light-rig"];
 const stripR3FSourceTags = {
   name: "strip-r3f-tsd-source",
   enforce: "post" as const,
   transform(code: string, id: string) {
-    if (!id.includes("SofaConfigurator") || !code.includes("data-tsd-source")) return null;
+    if (!R3F_MODULE_MARKERS.some((marker) => id.includes(marker)) || !code.includes("data-tsd-source")) return null;
     return {
       code: code.replace(/["']data-tsd-source["']\s*:\s*["'][^"']*["']\s*,?/g, ""),
       map: null,
