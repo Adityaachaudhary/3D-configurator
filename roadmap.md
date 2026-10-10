@@ -118,4 +118,4 @@
 - [x] Share existing dimensions and floor lift via sofa-spec.ts.
 - [x] Use leather swatch maps for Chesterfield and add the supplied development scale audit.
 - [ ] Apply bouclé, leather tile minimum and leg bump presets; blocked on user-supplied leather-grain.ts and material-looks.ts.
-- [ ] Verify Oat, Cognac and Oxblood in the viewer.
+- [x] Verify Oat, Cognac and Oxblood in the viewer; all render with no browser errors and build OK.
