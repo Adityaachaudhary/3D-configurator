@@ -10,7 +10,7 @@
 <!-- LOVABLE:END -->
 
 - Keep the 3D configurator client-only and isolate all Three.js scene logic in `SofaConfigurator.tsx` because WebGL cannot render during SSR.
-- Keep tested family defaults in `material-recipes.ts` and fixed upholstery, lighting and relief presets in `material-looks.ts`; apply looks before shader injection and chair cloning to preserve maps, tufting and seating consistency. `static-light-rig.tsx` supplies fixed Viewer lights; its JSX is covered by the `strip-r3f-tsd-source` plugin in `vite.config.ts`.
+- Keep tested family defaults in `material-recipes.ts` and fixed upholstery, lighting and relief presets in `material-looks.ts`; apply looks before shader injection and chair cloning to preserve maps, tufting and seating consistency. `static-light-rig.tsx` supplies fixed Viewer lights.
 - Use broad targeted rectangular environment lights and finite contact-shadow captures after size transitions settle; recapture on seating/scale changes and exclude floor/grid via camera layers so the sofa is grounded without shadow passes during orbit or baking the floor into a dark overlay.
 - Treat the uploaded sofa as one mesh and separate leg faces spatially (full tapered cone around each detected leg axis, up to the base underside) into a second material group because the source GLB has only one unnamed material.
 - Derive seating variants from fixed end caps and clipped central modules; build the inserted cushion from reflected crown halves with exact original centre-profile ends, corrected winding, and smooth mirror-plane normals so joins stay closed without nearest-profile distortion.
@@ -29,5 +29,6 @@
 - Restrict plain lining to the hidden base using undeformed source-space height below the base welt plus an inverse-transpose world-space facing normal and smooth masks; downward cushion folds keep upholstery because orientation alone misclassifies visible creases.
 - Use leather swatch maps for Chesterfield; keep analytic tuft antialiasing and derivative-free vertex relief.
 - Share dimensions and studio floor lift in `sofa-spec.ts` to keep transforms and measurements consistent.
-- Optimize the sofa offline with the reproducible `scripts/optimize-sofa.mjs` Meshoptimizer pass and a separate asset pointer; retain the original, lock triangles crossing module cut bands plus legs/base and silhouette extremes, and use normal-weighted simplification with a strict error budget to preserve curves without runtime simplification.
-- Strip TanStack devtools `data-tsd-source` tags from the 3D scene module via a post-transform Vite plugin, because R3F treats dashed props as nested object paths and crashes when they change on reload.
+- Optimize the sofa offline with `scripts/optimize-sofa.mjs` (Meshoptimizer, separate asset pointer, original retained); lock module cut bands, legs/base and silhouette extremes under a strict error budget so curves survive without runtime simplification.
+- Strip devtools `data-tsd-source` tags from 3D modules via a post-transform Vite plugin, because R3F treats dashed props as object paths and crashes on reload.
+- Import drei helpers and lucide icons by deep path in 3D modules, because the full barrels add ~15 MB of dev modules and broke preview loading.

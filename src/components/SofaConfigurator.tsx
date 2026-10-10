@@ -1,29 +1,27 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import {
-  ContactShadows,
-  Line,
-  OrbitControls,
-  useGLTF,
-  useTexture,
-} from "@react-three/drei";
-import {
-  Box,
-  Check,
-  ChevronDown,
-  CircleGauge,
-  Download,
-  Expand,
-  Frame,
-  Grid3X3,
-  Maximize2,
-  Minus,
-  Move3D,
-  Plus,
-  Rotate3D,
-  Ruler,
-  Scan,
-  SunMedium,
-} from "lucide-react";
+// Deep imports: the drei/lucide barrels pull ~15 MB of unused dev modules (incl. MediaPipe),
+// which made the preview's first load fail with "Failed to fetch dynamically imported module".
+import { ContactShadows } from "@react-three/drei/core/ContactShadows";
+import { Line } from "@react-three/drei/core/Line";
+import { OrbitControls } from "@react-three/drei/core/OrbitControls";
+import { useGLTF } from "@react-three/drei/core/Gltf";
+import { useTexture } from "@react-three/drei/core/Texture";
+import Box from "lucide-react/dist/esm/icons/box";
+import Check from "lucide-react/dist/esm/icons/check";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
+import CircleGauge from "lucide-react/dist/esm/icons/circle-gauge";
+import Download from "lucide-react/dist/esm/icons/download";
+import Expand from "lucide-react/dist/esm/icons/expand";
+import Frame from "lucide-react/dist/esm/icons/frame";
+import Grid3X3 from "lucide-react/dist/esm/icons/grid-3x3";
+import Maximize2 from "lucide-react/dist/esm/icons/maximize-2";
+import Minus from "lucide-react/dist/esm/icons/minus";
+import Move3D from "lucide-react/dist/esm/icons/move-3d";
+import Plus from "lucide-react/dist/esm/icons/plus";
+import Rotate3D from "lucide-react/dist/esm/icons/rotate-3d";
+import Ruler from "lucide-react/dist/esm/icons/ruler";
+import Scan from "lucide-react/dist/esm/icons/scan";
+import SunMedium from "lucide-react/dist/esm/icons/sun-medium";
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";

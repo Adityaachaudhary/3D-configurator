@@ -6,7 +6,8 @@
 //   toneMapping: THREE.NeutralToneMapping,
 //   toneMappingExposure: LIGHTING.exposure,
 
-import { Environment, Lightformer } from "@react-three/drei";
+import { Environment } from "@react-three/drei/core/Environment";
+import { Lightformer } from "@react-three/drei/core/Lightformer";
 
 import { LIGHTING as L } from "./material-looks";
 
