@@ -9,6 +9,17 @@ describe("Android AR rules", () => {
     expect(new URL(url).searchParams.has("scale")).toBe(false);
   });
   it("allows pinch resizing", () => { expect(arScale(0.1)).toBe(0.3); expect(arScale(4)).toBe(3); expect(arScale(1)).toBe(1); });
+  it("opens the standalone AR app from the editor", () => {
+    const url = new URL(buildARUrl("https://lovable.dev/projects/509c4dcd-5e06-420c-b286-4e068a01cc45", { fabric: "wisdom", leg: "oak", tile: 12 }));
+    expect(url.origin).toBe("https://id-preview--509c4dcd-5e06-420c-b286-4e068a01cc45.lovable.app");
+    expect(url.pathname).toBe("/");
+    expect(url.searchParams.get("ar")).toBe("1");
+  });
+  it("does not share a development port with phones", () => {
+    const url = new URL(buildARUrl("https://localhost:8080/", { fabric: "oat", leg: "oak", tile: 10 }));
+    expect(url.port).toBe("");
+    expect(url.origin).toBe("https://id-preview--509c4dcd-5e06-420c-b286-4e068a01cc45.lovable.app");
+  });
   it("rejects elevated surfaces and walls", () => {
     const floor = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
     expect(isARFloor(floor)).toBe(true);

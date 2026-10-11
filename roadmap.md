@@ -127,6 +127,7 @@
 - [x] Reclassify Wisdom as a Pattern fabric (₹80) so its sidebar group and price category match; Solids keeps only the four ₹50 fabrics.
 - [x] Remove Ochre Chevron and its related code (preset, FabricId, chevron pattern kind and drawing formula, material-looks override and tile entry, CSS pattern tokens, test entries); 13 fabrics remain, type check clean and 35 tests pass.
 ## Android AR
+- [ ] Ensure laptop QR opens the standalone AR screen, not the Lovable editor.
 - [ ] Reuse the configurator's two-seater geometry, materials and renderer in immersive AR.
 - [ ] Add floor-only placement, floor-preserving move/rotate/pinch, finish selection and live price.
 - [ ] Add laptop QR sharing of selected finishes and Android support/error states.

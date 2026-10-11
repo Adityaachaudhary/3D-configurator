@@ -9,7 +9,7 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-- Keep WebGL client-only in SofaConfigurator.tsx. ARCanvas reuses SofaModel/LightRig; ARViewer handles launch, QR and DOM controls only. Inverse placement-frame projection prevents texture sliding during AR movement.
+- Keep WebGL client-only; ARCanvas reuses SofaModel/LightRig and inverse placement projection. ARViewer owns launch/QR/DOM. QR targets the standalone app, never the editor; camera launch requires a phone tap.
 - Keep tested family defaults in `material-recipes.ts` and fixed upholstery, lighting and relief presets in `material-looks.ts`; apply looks before shader injection and chair cloning to preserve maps, tufting and seating consistency. `static-light-rig.tsx` supplies fixed Viewer lights.
 - Use broad targeted rectangular environment lights and finite contact-shadow captures after size transitions settle; recapture on seating/scale changes and exclude floor/grid via camera layers so the sofa is grounded without shadow passes during orbit or baking the floor into a dark overlay.
 - Treat the uploaded sofa as one mesh and separate leg faces spatially (full tapered cone around each detected leg axis, up to the base underside) into a second material group because the source GLB has only one unnamed material.
