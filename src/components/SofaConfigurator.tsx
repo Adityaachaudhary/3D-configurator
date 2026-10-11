@@ -64,7 +64,7 @@ function useReducedMotion() {
 const MODULE_WIDTH = 0.7;
 const FABRICS: FabricPreset[] = [
   { id: "oat", name: "Oat Bouclé", family: "Bouclé 04", color: "#b8aa91", weave: "boucle" },
-  { id: "wisdom", name: "Wisdom", family: "Client fabric", color: "", weave: "linen", photo: wisdomAsset.url },
+  { id: "wisdom", name: "Wisdom", family: "Client fabric", color: "", weave: "linen", printed: true, photo: wisdomAsset.url },
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
   { id: "ink", name: "Ink Velvet", family: "Velvet 02", color: "#34383b", weave: "velvet" },
