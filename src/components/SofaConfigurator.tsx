@@ -28,6 +28,7 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 import sofaAsset from "@/assets/Panache-OPAA-80pct.glb.asset.json";
 import { ARButton } from "@/components/ARViewer";
+import { arScale, isARFloor } from "@/lib/ar-config";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
@@ -1216,6 +1217,128 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
       <CameraRig controlsRef={controlsRef} view={view} zoomSignal={zoomSignal} seats={seats} scale={scale} reducedMotion={reducedMotion} />
     </Canvas>
   );
+}
+
+
+export function ARCanvas({ session, fabric, leg, textureScale, surface, onPlaced, onScale, onError, onReady, resetSignal }: {
+  session: XRSession; fabric: FabricId; leg: LegId; textureScale: number;
+  surface: RefObject<HTMLDivElement | null>; onPlaced: (v: boolean) => void;
+  onScale: (v: number) => void; onError: (v: string) => void; onReady: () => void; resetSignal: number;
+}) {
+  return <Canvas shadows dpr={[1, 1.5]} camera={{ near: 0.05, far: 50 }}
+    gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true, toneMapping: THREE.NeutralToneMapping, toneMappingExposure: LIGHTING.exposure, outputColorSpace: THREE.SRGBColorSpace }}>
+    <LightRig />
+    <Suspense fallback={null}>
+      <ARScene session={session} fabric={fabric} leg={leg} textureScale={textureScale} surface={surface} onPlaced={onPlaced} onScale={onScale} onError={onError} onReady={onReady} resetSignal={resetSignal} />
+    </Suspense>
+  </Canvas>;
+}
+
+function ARScene({ session, fabric, leg, textureScale, surface, onPlaced, onScale, onError, onReady, resetSignal }: Parameters<typeof ARCanvas>[0]) {
+  const { gl, camera } = useThree();
+  const root = useRef<THREE.Group>(null);
+  const reticle = useRef<THREE.Mesh>(null);
+  const hitSource = useRef<XRHitTestSource | null>(null);
+  const placed = useRef(false);
+  const validHit = useRef(false);
+  const [scale, setScale] = useState(1);
+  const scaleRef = useRef(1);
+  const gesture = useRef<{ x: number; y: number; distance: number; angle: number; moved: boolean } | null>(null);
+  const floorPoint = useMemo(() => new THREE.Vector3(), []);
+  const floorRay = useMemo(() => new THREE.Raycaster(), []);
+  useEffect(() => { setScale(1); scaleRef.current = 1; onScale(1); }, [resetSignal, onScale]);
+  useEffect(() => {
+    let disposed = false;
+    gl.xr.enabled = true;
+    gl.xr.setReferenceSpaceType("local-floor");
+    gl.setClearColor(0, 0);
+    async function start() {
+      try {
+        await gl.xr.setSession(session);
+        if (disposed) return;
+        const viewer = await session.requestReferenceSpace("viewer");
+        const requestHit = session.requestHitTestSource;
+        if (!requestHit) throw new Error("Floor detection is unavailable on this phone.");
+        const source = await requestHit.call(session, { space: viewer });
+        if (disposed) { source?.cancel(); return; }
+        hitSource.current = source ?? null;
+        onReady();
+      } catch (error) { onError(error instanceof Error ? error.message : "Could not start floor detection."); void session.end().catch(() => {}); }
+    }
+    void start();
+    return () => { disposed = true; hitSource.current?.cancel(); hitSource.current = null; };
+  }, [gl, session, onError, onReady]);
+  useFrame((_, __, frame) => {
+    if (!frame || placed.current || !hitSource.current || !reticle.current) return;
+    const reference = gl.xr.getReferenceSpace();
+    if (!reference) return;
+    const pose = frame.getHitTestResults(hitSource.current).map(hit => hit.getPose(reference)).find(p => p && isARFloor(p.transform.matrix));
+    validHit.current = Boolean(pose);
+    reticle.current.visible = Boolean(pose);
+    if (pose) reticle.current.matrix.fromArray(pose.transform.matrix);
+  });
+  useEffect(() => {
+    const element = surface.current;
+    if (!element) return;
+    function toFloor(x: number, y: number) {
+      if (!root.current) return null;
+      const xr = gl.xr.getCamera();
+      const eye = xr.cameras[0] ?? camera;
+      const rect = element?.getBoundingClientRect();
+      if (!rect || !rect.width || !rect.height) return null;
+      floorRay.setFromCamera(new THREE.Vector2((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1), eye);
+      const result = floorRay.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0), -root.current.position.y), floorPoint);
+      return result && floorRay.ray.origin.distanceTo(result) < 8 ? result.clone() : null;
+    }
+    const snapshot = (e: TouchEvent) => {
+      const a = e.touches[0], b = e.touches[1];
+      if (!a) return null;
+      return { x: b ? (a.clientX+b.clientX)/2 : a.clientX, y: b ? (a.clientY+b.clientY)/2 : a.clientY,
+        distance: b ? Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY) : 0,
+        angle: b ? Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX) : 0, moved: false };
+    };
+    const start = (e: TouchEvent) => { e.preventDefault(); gesture.current = snapshot(e); };
+    const move = (e: TouchEvent) => {
+      e.preventDefault(); const next = snapshot(e), previous = gesture.current;
+      if (!next || !previous || !placed.current || !root.current) return;
+      if (Boolean(next.distance) !== Boolean(previous.distance)) { gesture.current = next; return; }
+      const from = toFloor(previous.x, previous.y), to = toFloor(next.x, next.y);
+      if (from && to) { const delta = to.sub(from); if (delta.length() < 0.5) { root.current.position.x += delta.x; root.current.position.z += delta.z; } }
+      if (next.distance > 0 && previous.distance > 0) {
+        scaleRef.current = arScale(scaleRef.current * next.distance / previous.distance);
+        setScale(scaleRef.current); onScale(scaleRef.current);
+        root.current.rotation.y -= Math.atan2(Math.sin(next.angle-previous.angle),Math.cos(next.angle-previous.angle));
+      }
+      next.moved = previous.moved || Math.hypot(next.x-previous.x,next.y-previous.y) > 3 || next.distance > 0;
+      gesture.current = next;
+    };
+    const end = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length) { gesture.current = snapshot(e); return; }
+      if (!placed.current && validHit.current && root.current && reticle.current && !gesture.current?.moved) {
+        root.current.position.setFromMatrixPosition(reticle.current.matrix);
+        const gaze = gl.xr.getCamera().getWorldDirection(new THREE.Vector3());
+        root.current.rotation.y = Math.atan2(-gaze.x, -gaze.z);
+        root.current.visible = true; reticle.current.visible = false; placed.current = true; onPlaced(true);
+      }
+      gesture.current = null;
+    };
+    element.addEventListener("touchstart", start, { passive: false });
+    element.addEventListener("touchmove", move, { passive: false });
+    element.addEventListener("touchend", end, { passive: false });
+    element.addEventListener("touchcancel", end, { passive: false });
+    return () => { element.removeEventListener("touchstart",start); element.removeEventListener("touchmove",move); element.removeEventListener("touchend",end); element.removeEventListener("touchcancel",end); };
+  }, [surface, gl, camera, floorRay, floorPoint, onPlaced, onScale]);
+  return <>
+    <mesh ref={reticle} visible={false} matrixAutoUpdate={false}>
+      <ringGeometry args={[0.09,0.115,48]} onUpdate={geometry => geometry.rotateX(-Math.PI/2)} />
+      <meshBasicMaterial color={LIGHTING.envBase} opacity={0.9} transparent depthWrite={false} />
+    </mesh>
+    <group ref={root} visible={false}>
+      <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} seats={2} reducedMotion wireframe={false} arPlacement={root} />
+      <SofaContactShadows seats={2} scale={scale} />
+    </group>
+  </>;
 }
 
 function ToolButton({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: ReactNode }) {
