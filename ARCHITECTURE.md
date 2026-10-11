@@ -13,7 +13,7 @@ A full-screen browser 3D configurator for one supplied sofa model (Panache OPAA,
 | Feature | Details |
 |---|---|
 | Seating | 1, 2 or 3 seater, animated transitions, all derived from the one 2-seater mesh |
-| Upholstery | 14 finishes: Solids (5, including client photo fabric "Wisdom"), Patterns (4, three of them client photos), Leather & Chesterfield (3 + 2) |
+| Upholstery | 13 finishes: Solids (4), Patterns (4, all client photos), Leather & Chesterfield (3 + 2) |
 | Legs | Natural oak, Dark walnut, Ebonized wood, Brushed steel |
 | Texture tile | Slider 5–25 cm per tile (step 0.5, default 12.5). Label switches between "Grain tile" / "Pattern tile" / "Weave tile" |
 | Size | Model scale 80–120 %, exact inch size chart, units cm / mm / in |
@@ -129,7 +129,7 @@ vite.config.ts             strip-r3f-tsd-source plugin
 | Group | Fabrics | weave |
 |---|---|---|
 | Solids | Oat Bouclé (boucle), Wisdom (linen + photo), Clay Twill (twill), Forest Chenille (loop), Ink Velvet (velvet) | as listed |
-| Patterns | Ochre Chevron (procedural `pattern`, twill); Swatch Urban, Red Fish, Orange Pattern (`printed: true` + uploaded `photo`) | as listed |
+| Patterns | Swatch Urban, Red Fish, Orange Pattern (`printed: true` + uploaded `photo`) | as listed |
 | Leather | Cognac, Charcoal, Olive | leather |
 | Chesterfield | Oxblood, Saddle | leather + `tufted: true` |
 
@@ -270,7 +270,7 @@ Base: metalness 0, sheen 0, sheenRoughness 0.5, clearcoat 0, clearcoatRoughness 
 | `leatherHeightField(size, cells = 40)` | Pure `Float32Array` generator: tileable Worley (cellular) grain — jittered sites per cell, nearest/second-nearest distance forming rounded pebbles with steep narrow creases, plus per-cell height variation. Forty cells across a tile gives approximately 3.1mm grain at the default 12.5cm tile. Shared grain drives colour, bump and roughness; no texture downloads or true normal/AO maps. All five leather finishes, including Chesterfields, use these 512px model maps; Chesterfield model tufting stays analytic and the 2048px diamond map is no longer generated. |
 | `boucleHeightField(size, cells = 14)` | Same file, same tileable Worley machinery: each cell is a rounded loop (1 at its centre, 0 in the gaps) with a random height per cell, so raised vs recessed is unambiguous — the old symmetric `sin × cos` "loop" height flipped with the lighting and read as reversed relief. Fourteen loops across a tile gives approximately 7mm loops at Oat's 10cm tile. Used by `createSurfaceMaps("boucle")`; Forest Chenille keeps the `loop` height. |
 | `createPhotoSurfaceMaps(img, cropPixels?, reliefStrength = 0.45)` | Central square crop of the photo drawn 4× mirrored into a 1024px canvas (seamless, no stretching). Red Fish uses a 128px source crop so its many tiny motifs remain visible at the default physical tile size; Wisdom, Swatch Urban and Orange Pattern use the largest square crop. bump = luminance scaled by `reliefStrength`; roughness inverse to height. When `reliefStrength > 0.6` (Swatch Urban tweed passes 1.1), a synthetic woven crosshatch is added on top of the photo relief: 48 rounded warp/weft yarns per tile with a broken-twill interlace and slub speckle, thread gaps darken the photo colour slightly, and roughness gaps stay flatter — so the weave reads as real threads, not a flat print. |
-| `createPatternCanvas(fabric)` | 1024px pattern from 3 token colours, with a faint 3 % thread modulation. check/chevron/diamond formulas. The stripe formula was removed with Ocean Stripe and Graphite Stripe; diamond has no remaining preset since Teal Diamond was replaced by Orange Pattern. |
+| `createPatternCanvas(fabric)` | 1024px pattern from 3 token colours, with a faint 3 % thread modulation. check/diamond formulas. The stripe formula was removed with Ocean Stripe and Graphite Stripe, and the chevron formula with Ochre Chevron; no preset currently uses a procedural pattern, since Teal Diamond became Orange Pattern and the remaining client fabrics are uploaded photos. |
 | `patternTexture` | `CanvasTexture` of that canvas (sRGB, repeat). |
 | `FabricSwatch` | 192px canvas: procedural patterns tiled 3×3; plain/leather = token colour × `createSurfaceMaps` colour (tuft map for Chesterfield). Pixel rows use `maps.map.image.width`, not a fixed 256px stride, so 512px leather and 2048px tuft sources sample correctly. Wisdom, Swatch Urban, Red Fish and Orange Pattern show their original photo `<img>` with the selected fabric's accessible name. |
 

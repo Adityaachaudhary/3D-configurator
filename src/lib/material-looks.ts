@@ -85,7 +85,6 @@ const OVERRIDES: Record<string, Partial<MaterialLook>> = {
 
   // Patterns / photo fabrics
   wisdom: { ...PATTERN },
-  "ochre-chevron": { ...PATTERN },
   "orange-pattern": { ...PATTERN },
   "red-fish": { ...PATTERN },
   "swatch-urban": { roughness: 1, sheen: 0.5, sheenRoughness: 0.62, sheenGrey: 0.4, bumpScale: 1.2 },
@@ -110,7 +109,7 @@ export const MIN_LEATHER_TILE_CM = 14;
 
 const TILE_CM: Record<string, number> = {
   oat: 10, wisdom: 12, clay: 8, moss: 8, ink: 8,
-  "ochre-chevron": 6, "orange-pattern": 8, "red-fish": 6, "swatch-urban": 8,
+  "orange-pattern": 8, "red-fish": 6, "swatch-urban": 8,
   "cognac-leather": 20, "charcoal-leather": 20, "olive-leather": 20,
   "chesterfield-oxblood": 20, "chesterfield-saddle": 20,
 };
