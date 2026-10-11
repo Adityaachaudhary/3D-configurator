@@ -13,7 +13,7 @@ A full-screen browser 3D configurator for one supplied sofa model (Panache OPAA,
 | Feature | Details |
 |---|---|
 | Seating | 1, 2 or 3 seater, animated transitions, all derived from the one 2-seater mesh |
-| Upholstery | 14 finishes: Solids (5, including client photo fabric "Wisdom"), Patterns (4, three of them client photos), Leather & Chesterfield (3 + 2) |
+| Upholstery | 13 finishes: Solids (4), Patterns (4, all client photos), Leather & Chesterfield (3 + 2) |
 | Legs | Natural oak, Dark walnut, Ebonized wood, Brushed steel |
 | Texture tile | Slider 5–25 cm per tile (step 0.5, default 12.5). Label switches between "Grain tile" / "Pattern tile" / "Weave tile" |
 | Size | Model scale 80–120 %, exact inch size chart, units cm / mm / in |
