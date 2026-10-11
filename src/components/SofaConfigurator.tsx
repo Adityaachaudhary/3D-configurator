@@ -27,10 +27,7 @@ import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 import sofaAsset from "@/assets/Panache-OPAA-80pct.glb.asset.json";
-import wisdomAsset from "@/assets/wisdom-fabric.png.asset.json";
-import redFishAsset from "@/assets/red-fish-fabric.png.asset.json";
-import swatchUrbanAsset from "@/assets/swatch-urban-fabric.png.asset.json";
-import orangeAsset from "@/assets/orange-pattern-fabric.png.asset.json";
+import { ARButton } from "@/components/ARViewer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
@@ -39,7 +36,7 @@ import { boucleHeightField, leatherHeightField } from "@/lib/leather-grain";
 import { seatingWidth, BASE_SIZE, FLOOR_LIFT } from "@/lib/sofa-spec";
 import { LightRig } from "@/lib/static-light-rig";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
-import { PRICE_PER_SEAT, PRICE_PER_LEG_FINISH, fabricPrice, totalPrice, formatINR } from "@/lib/pricing";
+import { PRICE_PER_SEAT, fabricPrice, legFinishPrice, totalPrice, formatINR } from "@/lib/pricing";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "check" | "diamond";
@@ -64,13 +61,13 @@ function useReducedMotion() {
 const MODULE_WIDTH = 0.7;
 const FABRICS: FabricPreset[] = [
   { id: "oat", name: "Oat Bouclé", family: "Bouclé 04", color: "#b8aa91", weave: "boucle" },
-  { id: "wisdom", name: "Wisdom", family: "Client fabric", color: "", weave: "linen", printed: true, photo: wisdomAsset.url },
+  { id: "wisdom", name: "Wisdom", family: "Client fabric", color: "", weave: "linen", printed: true, photo: "/wisdom.png" },
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
   { id: "ink", name: "Ink Velvet", family: "Velvet 02", color: "#34383b", weave: "velvet" },
-  { id: "swatch-urban", name: "Swatch Urban", family: "Client fabric · Textured tweed", color: "", weave: "tweed", printed: true, photo: swatchUrbanAsset.url },
-  { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "", weave: "linen", printed: true, photo: redFishAsset.url },
-  { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "", weave: "twill", printed: true, photo: orangeAsset.url, directional: true },
+  { id: "swatch-urban", name: "Swatch Urban", family: "Client fabric · Textured tweed", color: "#8a8680", weave: "tweed", printed: true },
+  { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "#b44646", weave: "linen", printed: true },
+  { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "#d28c50", weave: "twill", printed: true, directional: true },
   { id: "cognac-leather", name: "Cognac Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "charcoal-leather", name: "Charcoal Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "olive-leather", name: "Olive Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
@@ -945,7 +942,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
   const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
   const leather = selectedFabric.weave === "leather";
-  const fabricPhoto = useTexture(selectedFabric.photo ?? wisdomAsset.url);
+  const fabricPhoto = useTexture(selectedFabric.photo ?? "/wisdom.png");
   const patternTexture = useMemo(() => {
     if (!selectedFabric.pattern) return null;
     const texture = new THREE.CanvasTexture(createPatternCanvas(selectedFabric));
@@ -1251,7 +1248,7 @@ export function SofaConfigurator() {
   const selectedFabric = FABRICS.find((item) => item.id === fabric) ?? DEFAULT_FABRIC;
   const selectedLeg = LEGS.find((item) => item.id === leg) ?? DEFAULT_LEG;
   const fabricRate = fabricPrice(selectedFabric);
-  const price = totalPrice(seats, selectedFabric);
+  const price = totalPrice(seats, selectedFabric, selectedLeg.id);
 
   return (
     <main data-configurator-root className="relative h-dvh min-h-[620px] overflow-hidden bg-background text-foreground">
@@ -1263,6 +1260,7 @@ export function SofaConfigurator() {
         </div>
         <div className="hidden text-center md:block"><div className="text-xs font-semibold">Panache OPAA · {seats} seater</div><div className="mt-1 text-[10px] text-muted-foreground">{selectedFabric.name} · {selectedLeg.name}</div></div>
         <div className="pointer-events-auto flex items-center gap-2">
+          <ARButton seats={seats} />
           <Button variant="outline" size="icon-sm" onClick={screenshot} aria-label="Download image" title="Download image"><Download className="size-4" /></Button>
           <Button variant="outline" size="icon-sm" onClick={fullscreen} aria-label="Fullscreen" title="Fullscreen"><Expand className="size-4" /></Button>
         </div>
@@ -1360,7 +1358,7 @@ export function SofaConfigurator() {
           <dl className="mt-2 space-y-1 border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
             <div className="flex items-center justify-between"><dt>{seats} seater</dt><dd className="font-mono">{formatINR(seats * PRICE_PER_SEAT)}</dd></div>
             <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedFabric.name}</dt><dd className="font-mono">{formatINR(fabricRate)}</dd></div>
-            <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedLeg.name}</dt><dd className="font-mono">{formatINR(PRICE_PER_LEG_FINISH)}</dd></div>
+            <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedLeg.name}</dt><dd className="font-mono">{formatINR(legFinishPrice(selectedLeg.id))}</dd></div>
           </dl>
         )}
       </section>

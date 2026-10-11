@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { FABRIC_PRICES, PRICE_PER_LEG_FINISH, PRICE_PER_SEAT, fabricPrice, formatINR, totalPrice } from "@/lib/pricing";
+import {
+  FABRIC_PRICES,
+  PRICE_PER_LEG_FINISH,
+  PRICE_PER_SEAT,
+  fabricPrice,
+  formatINR,
+  legFinishPrice,
+  totalPrice,
+} from "@/lib/pricing";
 
 describe("pricing (mock INR rates)", () => {
   it("charges 150 per seat", () => {
@@ -32,6 +40,14 @@ describe("pricing (mock INR rates)", () => {
     expect(totalPrice(1, solid)).toBe(150 + 50 + 100);
     expect(totalPrice(2, solid)).toBe(300 + 50 + 100);
     expect(totalPrice(3, { weave: "leather" })).toBe(450 + 100 + 100);
+  });
+
+  it("charges the same 100 mock surcharge for every leg finish", () => {
+    const solid = { weave: "boucle" };
+    for (const finish of ["oak", "walnut", "ebonized", "steel"] as const) {
+      expect(legFinishPrice(finish)).toBe(PRICE_PER_LEG_FINISH);
+      expect(totalPrice(2, solid, finish)).toBe(300 + 50 + PRICE_PER_LEG_FINISH);
+    }
   });
 
   it("formats totals as INR without decimals", () => {

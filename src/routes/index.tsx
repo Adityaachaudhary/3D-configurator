@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SofaConfigurator } from "@/components/SofaConfigurator";
+import { ARLaunchScreen, isARLaunch } from "@/components/ARViewer";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -17,5 +18,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  // ?ar=1 means the phone scanned the QR — show AR launch screen, not the configurator
+  if (isARLaunch()) return <ARLaunchScreen />;
   return <SofaConfigurator />;
 }

@@ -5,6 +5,7 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 
 // TanStack devtools injects `data-tsd-source` on every JSX element. React Three Fiber treats
 // dashed props as nested paths on three.js objects and throws when the value changes on HMR,
@@ -29,6 +30,7 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    plugins: [stripR3FSourceTags],
+    plugins: [stripR3FSourceTags, basicSsl()],
+    server: { host: "0.0.0.0", port: 3000 },
   },
 });
