@@ -136,7 +136,7 @@ function createSurfaceMaps(kind: string) {
         height = 0.5 + 0.22 * (over > 0 ? warp : weft) + noise * 0.06;
       }
       const i = (y * size + x) * 4;
-      const contrast = kind === "wood" ? 0.3 : kind === "steel" ? 0.1 : kind === "leather" ? 0.2 : kind === "velvet" ? 0.045 : kind === "boucle" ? 0.35 : kind === "loop" ? 0.5 : 0.32;
+      const contrast = kind === "wood" ? 0.3 : kind === "steel" ? 0.1 : kind === "leather" ? 0.2 : kind === "velvet" ? 0.045 : kind === "boucle" ? 0.2 : kind === "loop" ? 0.5 : 0.32;
       // Clamp: Uint8Array wraps out-of-range values, which turned wood grain crests black.
       const value = Math.round(255 * THREE.MathUtils.clamp(kind === "tuft" ? 0.72 + height * 0.28 : 0.94 + (height - 0.5) * contrast, 0, 1));
       height = THREE.MathUtils.clamp(height, 0, 1);
@@ -315,7 +315,7 @@ const tuftProfileGLSL = `
     float crown = pow(max(0.0, sin(cell.x * 3.14159265) * sin(cell.y * 3.14159265)), 1.3);
     float edgeWidth = max(max(filterWidth.x, filterWidth.y), 0.00001);
     float pleat = (1.0 - exp(-min(edge.x, edge.y) / 0.035)) * smoothstep(0.0, edgeWidth, min(edge.x, edge.y));
-    return clamp(0.30 + 0.62 * crown + 0.08 * pleat - 0.34 * exp(-r / 0.0055) + 0.16 * detail * exp(-r / 0.00035), 0.0, 1.0);
+    return clamp(0.30 + 0.62 * crown + 0.08 * pleat - 0.34 * exp(-r / 0.0055) + 0.22 * detail * exp(-r / 0.0011), 0.0, 1.0);
   }
   float tuftProfile(vec2 uv, float detail) { return tuftProfile(uv, detail, vec2(0.0)); }
   // Independent sewn-panel coordinates. Use joined world coordinates so a
@@ -426,7 +426,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
           vec3 w = pow(abs(normalize(surfaceNormal)), vec3(12.0));
           w /= max(dot(w, vec3(1.0)), 0.0001);
           // Fade button heads once they shrink below a pixel to avoid sparkle.
-          float detail = 1.0 - smoothstep(0.012, 0.04, length(fwidth(surfacePosition)) * tuftDensity);
+          float detail = 1.0 - smoothstep(0.03, 0.09, length(fwidth(surfacePosition)) * tuftDensity);
           vec2 armUV = armTuftUV(p) * tuftDensity;
           vec2 seatUV = seatTuftUV(p) * tuftDensity;
           vec2 backUV = backTuftUV(p) * tuftDensity;
@@ -465,7 +465,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         int tpPanel = (tpA.y >= tpA.x && tpA.y >= tpA.z) ? 1 : ((tpA.z >= tpA.x) ? 2 : 0);
         vec2 tpUv = (tpPanel == 0 ? armTuftUV(surfacePosition) : (tpPanel == 1 ? seatTuftUV(surfacePosition) : backTuftUV(surfacePosition))) * tuftDensity;
         vec2 tpFp = fwidth(vec2(tpUv.x + tpUv.y, tpUv.x - tpUv.y));
-        float tpDetail = 1.0 - smoothstep(0.012, 0.04, length(fwidth(surfacePosition)) * tuftDensity);
+        float tpDetail = 1.0 - smoothstep(0.03, 0.09, length(fwidth(surfacePosition)) * tuftDensity);
         vec3 tpE1 = tpPanel == 0 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
         vec3 tpE2 = tpPanel == 1 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
         float tpStep = ${(0.003 * scale).toFixed(6)};
@@ -514,7 +514,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v20-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}${directional ? "-dir" : ""}-soft${soften}`;
+  material.customProgramCacheKey = () => `physical-surface-v21-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}${directional ? "-dir" : ""}-soft${soften}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {

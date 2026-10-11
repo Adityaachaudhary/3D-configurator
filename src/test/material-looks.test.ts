@@ -80,7 +80,7 @@ describe("per-fabric material looks", () => {
     material.dispose();
   });
   it("uses the supplied woven bump strengths", () => {
-    for (const [id, bump] of Object.entries({ oat: 0.9, clay: 2.2, moss: 2, wisdom: 1, "orange-pattern": 1, "red-fish": 1, "ochre-chevron": 1 })) {
+    for (const [id, bump] of Object.entries({ oat: 2.5, clay: 2.2, moss: 2, wisdom: 1, "orange-pattern": 1, "red-fish": 1, "ochre-chevron": 1 })) {
       expect(resolveLook(id, "woven").bumpScale).toBe(bump);
     }
     expect(resolveLook("unknown", "woven").bumpScale).toBe(2);
