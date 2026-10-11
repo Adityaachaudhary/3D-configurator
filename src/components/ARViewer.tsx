@@ -78,8 +78,10 @@ function AROverlay({ session, config, onError }: { session: XRSession; config: A
   const exit = () => { void session.end().catch(() => {}); };
   useEffect(() => {
     const previous = document.body.style.background;
+    const previousTouch = document.body.style.touchAction;
+    document.body.style.touchAction = "none";
     document.body.style.background = "transparent";
-    return () => { document.body.style.background = previous; };
+    return () => { document.body.style.background = previous; document.body.style.touchAction = previousTouch; };
   }, []);
   return createPortal(<div className="fixed inset-0 z-50 bg-transparent text-foreground" data-ar-overlay>
     <div className="absolute inset-0"><ARCanvas session={session} fabric={fabric} leg={leg} textureScale={tile} surface={surface} onPlaced={setPlaced} onScale={setScale} onReady={readyCallback} onError={onError} resetSignal={reset} /></div>
@@ -117,7 +119,6 @@ export function ARLaunchScreen() {
 
 export function ARButton({ seats, fabric, leg, tile }: ARConfiguration & { seats: number }) {
   const [qr, setQr] = useState(false);
-  const ar = useARSession();
   if (!arEligible(seats)) return null;
   const config = { fabric, leg, tile };
   return <>

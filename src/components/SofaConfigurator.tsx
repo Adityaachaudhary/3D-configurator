@@ -26,6 +26,9 @@ import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type Re
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
+import urbanAsset from "@/assets/swatch-urban-fabric.png.asset.json";
+import redFishAsset from "@/assets/red-fish-fabric.png.asset.json";
+import orangeAsset from "@/assets/orange-pattern-fabric.png.asset.json";
 import sofaAsset from "@/assets/Panache-OPAA-80pct.glb.asset.json";
 import { ARButton } from "@/components/ARViewer";
 import { arScale, isARFloor } from "@/lib/ar-config";
@@ -66,9 +69,9 @@ export const FABRICS: FabricPreset[] = [
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
   { id: "ink", name: "Ink Velvet", family: "Velvet 02", color: "#34383b", weave: "velvet" },
-  { id: "swatch-urban", name: "Swatch Urban", family: "Client fabric · Textured tweed", color: "#8a8680", weave: "tweed", printed: true, photo: "/swatch-urban-fabric.png" },
-  { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "#b44646", weave: "linen", printed: true, photo: "/red-fish-fabric.png" },
-  { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "#d28c50", weave: "twill", printed: true, directional: true, photo: "/orange-pattern-fabric.png" },
+  { id: "swatch-urban", name: "Swatch Urban", family: "Client fabric · Textured tweed", color: "#8a8680", weave: "tweed", printed: true, photo: urbanAsset.url },
+  { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "#b44646", weave: "linen", printed: true, photo: redFishAsset.url },
+  { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "#d28c50", weave: "twill", printed: true, directional: true, photo: orangeAsset.url },
   { id: "cognac-leather", name: "Cognac Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "charcoal-leather", name: "Charcoal Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "olive-leather", name: "Olive Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
@@ -1275,7 +1278,7 @@ function ARScene({ session, fabric, leg, textureScale, surface, onPlaced, onScal
     const pose = frame.getHitTestResults(hitSource.current).map(hit => hit.getPose(reference)).find(p => p && isARFloor(p.transform.matrix));
     validHit.current = Boolean(pose);
     reticle.current.visible = Boolean(pose);
-    if (pose) reticle.current.matrix.fromArray(pose.transform.matrix);
+    if (pose) { reticle.current.matrix.fromArray(pose.transform.matrix); reticle.current.matrixWorldNeedsUpdate = true; }
   });
   useEffect(() => {
     const element = surface.current;
@@ -1332,7 +1335,7 @@ function ARScene({ session, fabric, leg, textureScale, surface, onPlaced, onScal
   return <>
     <mesh ref={reticle} visible={false} matrixAutoUpdate={false}>
       <ringGeometry args={[0.09,0.115,48]} onUpdate={geometry => geometry.rotateX(-Math.PI/2)} />
-      <meshBasicMaterial color={LIGHTING.envBase} opacity={0.9} transparent depthWrite={false} />
+      <meshBasicMaterial color={new THREE.Color(1, 1, 1)} opacity={0.9} transparent depthWrite={false} />
     </mesh>
     <group ref={root} visible={false}>
       <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} seats={2} reducedMotion wireframe={false} arPlacement={root} />
