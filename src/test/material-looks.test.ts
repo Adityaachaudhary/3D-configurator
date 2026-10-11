@@ -4,7 +4,7 @@ import { applyLook, resolveLook, tileFor, LIGHTING, RELIEF, MIN_LEATHER_TILE_CM,
 
 describe("per-fabric material looks", () => {
   it("uses supplied per-fabric tiles and falls back for unknown fabrics", () => {
-    for (const [id, tile] of Object.entries({ oat: 10, wisdom: 12, clay: 8, moss: 8, ink: 8, "ochre-chevron": 6, "orange-pattern": 8, "red-fish": 6, "swatch-urban": 8, "cognac-leather": 20, "charcoal-leather": 20, "olive-leather": 20, "chesterfield-oxblood": 20, "chesterfield-saddle": 20 })) expect(tileFor(id, 12.5)).toBe(tile);
+    for (const [id, tile] of Object.entries({ oat: 10, wisdom: 12, clay: 8, moss: 8, ink: 8, "orange-pattern": 8, "red-fish": 6, "swatch-urban": 8, "cognac-leather": 20, "charcoal-leather": 20, "olive-leather": 20, "chesterfield-oxblood": 20, "chesterfield-saddle": 20 })) expect(tileFor(id, 12.5)).toBe(tile);
     expect(tileFor("unknown", 7)).toBe(7);
   });
   it("preserves fixed product exposure", () => {
@@ -39,7 +39,7 @@ describe("per-fabric material looks", () => {
     material.dispose();
   });
   it("uses a linear grey sheen for white-base photo and pattern fabrics", () => {
-    for (const id of ["wisdom", "red-fish", "orange-pattern", "ochre-chevron", "swatch-urban"]) {
+    for (const id of ["wisdom", "red-fish", "orange-pattern", "swatch-urban"]) {
       const look = resolveLook(id, "woven");
       const material = new MeshPhysicalMaterial();
       applyLook(material, look, new Color(1, 1, 1), true);
@@ -80,7 +80,7 @@ describe("per-fabric material looks", () => {
     material.dispose();
   });
   it("uses the supplied woven bump strengths", () => {
-    for (const [id, bump] of Object.entries({ oat: 2.5, clay: 2.2, moss: 2, wisdom: 1, "orange-pattern": 1, "red-fish": 1, "ochre-chevron": 1 })) {
+    for (const [id, bump] of Object.entries({ oat: 2.5, clay: 2.2, moss: 2, wisdom: 1, "orange-pattern": 1, "red-fish": 1 })) {
       expect(resolveLook(id, "woven").bumpScale).toBe(bump);
     }
     expect(resolveLook("unknown", "woven").bumpScale).toBe(2);

@@ -41,8 +41,8 @@ import { LightRig } from "@/lib/static-light-rig";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 import { PRICE_PER_SEAT, PRICE_PER_LEG_FINISH, fabricPrice, totalPrice, formatINR } from "@/lib/pricing";
 
-type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "ochre-chevron" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
-type PatternKind = "check" | "chevron" | "diamond";
+type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
+type PatternKind = "check" | "diamond";
 type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; printed?: boolean; tufted?: boolean; photo?: string; directional?: boolean };
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
 type Unit = "cm" | "mm" | "in";
@@ -70,7 +70,6 @@ const FABRICS: FabricPreset[] = [
   { id: "ink", name: "Ink Velvet", family: "Velvet 02", color: "#34383b", weave: "velvet" },
   { id: "swatch-urban", name: "Swatch Urban", family: "Client fabric · Textured tweed", color: "", weave: "tweed", printed: true, photo: swatchUrbanAsset.url },
   { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "", weave: "linen", printed: true, photo: redFishAsset.url },
-  { id: "ochre-chevron", name: "Ochre Chevron", family: "Chevron · Twill", color: "#ffffff", weave: "twill", pattern: "chevron" },
   { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "", weave: "twill", printed: true, photo: orangeAsset.url, directional: true },
   { id: "cognac-leather", name: "Cognac Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "charcoal-leather", name: "Charcoal Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
@@ -246,11 +245,6 @@ function createPatternCanvas(fabric: FabricPreset) {
     if (fabric.pattern === "check") {
       const a = u < 0.5, b = v < 0.5;
       color = a && b ? 1 : a || b ? 2 : 0;
-    }
-    if (fabric.pattern === "chevron") {
-      const zig = Math.abs(u * 2 - 1);
-      const band = (v + zig * 0.5) % 1;
-      color = band < 0.42 ? 0 : band < 0.82 ? 1 : 2;
     }
     if (fabric.pattern === "diamond") {
       const d = Math.abs(u - 0.5) + Math.abs(v - 0.5);
