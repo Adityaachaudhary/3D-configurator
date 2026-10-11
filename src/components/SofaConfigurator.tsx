@@ -26,8 +26,12 @@ import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type Re
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
+import urbanAsset from "@/assets/swatch-urban-fabric.png.asset.json";
+import redFishAsset from "@/assets/red-fish-fabric.png.asset.json";
+import orangeAsset from "@/assets/orange-pattern-fabric.png.asset.json";
 import sofaAsset from "@/assets/Panache-OPAA-80pct.glb.asset.json";
 import { ARButton } from "@/components/ARViewer";
+import { arScale, isARFloor } from "@/lib/ar-config";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { materialRecipe } from "@/lib/material-recipes";
@@ -38,10 +42,10 @@ import { LightRig } from "@/lib/static-light-rig";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 import { PRICE_PER_SEAT, fabricPrice, legFinishPrice, totalPrice, formatINR } from "@/lib/pricing";
 
-type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
+export type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "check" | "diamond";
 type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; printed?: boolean; tufted?: boolean; photo?: string; directional?: boolean };
-type LegId = "oak" | "walnut" | "ebonized" | "steel";
+export type LegId = "oak" | "walnut" | "ebonized" | "steel";
 type Unit = "cm" | "mm" | "in";
 type ViewName = "perspective" | "front" | "side" | "rear";
 type SeatCount = 1 | 2 | 3;
@@ -59,22 +63,22 @@ function useReducedMotion() {
 }
 
 const MODULE_WIDTH = 0.7;
-const FABRICS: FabricPreset[] = [
+export const FABRICS: FabricPreset[] = [
   { id: "oat", name: "Oat Bouclé", family: "Bouclé 04", color: "#b8aa91", weave: "boucle" },
   { id: "wisdom", name: "Wisdom", family: "Client fabric", color: "", weave: "linen", printed: true, photo: "/wisdom.png" },
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
   { id: "ink", name: "Ink Velvet", family: "Velvet 02", color: "#34383b", weave: "velvet" },
-  { id: "swatch-urban", name: "Swatch Urban", family: "Client fabric · Textured tweed", color: "#8a8680", weave: "tweed", printed: true },
-  { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "#b44646", weave: "linen", printed: true },
-  { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "#d28c50", weave: "twill", printed: true, directional: true },
+  { id: "swatch-urban", name: "Swatch Urban", family: "Client fabric · Textured tweed", color: "#8a8680", weave: "tweed", printed: true, photo: urbanAsset.url },
+  { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "#b44646", weave: "linen", printed: true, photo: redFishAsset.url },
+  { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "#d28c50", weave: "twill", printed: true, directional: true, photo: orangeAsset.url },
   { id: "cognac-leather", name: "Cognac Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "charcoal-leather", name: "Charcoal Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "olive-leather", name: "Olive Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "chesterfield-oxblood", name: "Oxblood Chesterfield", family: "Leather · Button tufted", color: "", weave: "leather", tufted: true },
   { id: "chesterfield-saddle", name: "Saddle Chesterfield", family: "Leather · Button tufted", color: "", weave: "leather", tufted: true },
 ];
-const LEGS: Array<{ id: LegId; name: string; color: string; metalness: number; roughness: number }> = [
+export const LEGS: Array<{ id: LegId; name: string; color: string; metalness: number; roughness: number }> = [
   { id: "oak", name: "Natural oak", color: "#9b7147", metalness: 0, roughness: 0.54 },
   { id: "walnut", name: "Dark walnut", color: "#4f3225", metalness: 0, roughness: 0.48 },
   { id: "ebonized", name: "Ebonized wood", color: "#20211f", metalness: 0, roughness: 0.42 },
@@ -320,8 +324,11 @@ const tuftProfileGLSL = `
   }
 `;
 
-function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null, patternRepeat = density * (8 / 5.6), tuft = false, undersideColor: THREE.Color | null = null, photo = false, soften = 0, directional = false) {
+function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null, patternRepeat = density * (8 / 5.6), tuft = false, undersideColor: THREE.Color | null = null, photo = false, soften = 0, directional = false, placement?: RefObject<THREE.Group | null>) {
   material.onBeforeCompile = (shader) => {
+    shader.uniforms["surfaceFrame"] = { value: new THREE.Matrix4() };
+    shader.uniforms["surfaceFrameWorld"] = { value: new THREE.Matrix4() };
+    material.userData["surfaceShader"] = shader;
     shader.uniforms["surfaceDensity"] = { value: density / scale };
     if (undersideColor) shader.uniforms["undersideColor"] = { value: undersideColor };
     if (tuft) {
@@ -332,7 +339,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       shader.uniforms["patternMap"] = { value: pattern };
       shader.uniforms["patternDensity"] = { value: patternRepeat / scale };
     }
-    shader.vertexShader = "varying vec3 surfacePosition; varying vec3 surfaceNormal; varying vec3 surfaceFacingNormal; varying float surfaceBaseHeight;\n" + shader.vertexShader;
+    shader.vertexShader = "uniform mat4 surfaceFrame; uniform mat4 surfaceFrameWorld; varying vec3 surfacePosition; varying vec3 surfaceNormal; varying vec3 surfaceFacingNormal; varying float surfaceBaseHeight;\n" + shader.vertexShader;
     if (soften > 0) {
       shader.uniforms["normalSoften"] = { value: soften };
       shader.vertexShader = shader.vertexShader
@@ -363,15 +370,15 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
           return dot(vec3(tuftProfile(armTuftUV(p) * tuftDensity, 0.0), tuftProfile(seatTuftUV(p) * tuftDensity, 0.0), tuftProfile(backTuftUV(p) * tuftDensity, 0.0)), w);
         }`);
       shader.vertexShader = shader.vertexShader.replace("#include <project_vertex>", `
-        vec3 tuftOriginalPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
-        vec3 tuftNormal = normalize(vec3(dot(tuftDirection, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(tuftDirection, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(tuftDirection, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));
-        vec3 tuftPanel = normalize(vec3(dot(tuftFrame.xyz, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(tuftFrame.xyz, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(tuftFrame.xyz, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));
+        vec3 tuftOriginalPosition = (surfaceFrame * modelMatrix * vec4(transformed, 1.0)).xyz;
+        vec3 tuftNormal = normalize(vec3(dot(tuftDirection, inverseTransformDirection(vec3(1.0, 0.0, 0.0), surfaceFrame * modelMatrix)), dot(tuftDirection, inverseTransformDirection(vec3(0.0, 1.0, 0.0), surfaceFrame * modelMatrix)), dot(tuftDirection, inverseTransformDirection(vec3(0.0, 0.0, 1.0), surfaceFrame * modelMatrix))));
+        vec3 tuftPanel = normalize(vec3(dot(tuftFrame.xyz, inverseTransformDirection(vec3(1.0, 0.0, 0.0), surfaceFrame * modelMatrix)), dot(tuftFrame.xyz, inverseTransformDirection(vec3(0.0, 1.0, 0.0), surfaceFrame * modelMatrix)), dot(tuftFrame.xyz, inverseTransformDirection(vec3(0.0, 0.0, 1.0), surfaceFrame * modelMatrix))));
         // Panels only: rolled edges, wrinkled borders and the welt above the
         // legs stay smooth so the surface never tears where projections meet.
         vTuftMask = tuftFrame.w * tuftPanelMask(tuftPanel);
         // Recess seams and buttons inside the original envelope; padded crowns
         // retain the supplied sofa dimensions instead of inflating its bounds.
-        vec3 tuftOffset = -tuftNormal * tuftDepth * vTuftMask * (1.0 - paddedHeight(tuftOriginalPosition, tuftPanel));
+        vec3 tuftOffset = (surfaceFrameWorld * vec4(-tuftNormal * tuftDepth * vTuftMask * (1.0 - paddedHeight(tuftOriginalPosition, tuftPanel)), 0.0)).xyz;
         vec3 tuftX = modelMatrix[0].xyz, tuftY = modelMatrix[1].xyz, tuftZ = modelMatrix[2].xyz;
         transformed += vec3(dot(tuftOffset, tuftX) / max(dot(tuftX, tuftX), 0.000001), dot(tuftOffset, tuftY) / max(dot(tuftY, tuftY), 0.000001), dot(tuftOffset, tuftZ) / max(dot(tuftZ, tuftZ), 0.000001));
         #include <project_vertex>`);
@@ -379,19 +386,20 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
     shader.vertexShader = shader.vertexShader.replace("#include <worldpos_vertex>", `#include <worldpos_vertex>
       // transformedNormal uses the inverse-transpose normal matrix in view space.
       // Convert it to world space; keep it separate from the tuft projection frame.
-      surfaceFacingNormal = inverseTransformDirection(transformedNormal, viewMatrix);
+      surfaceFacingNormal = mat3(surfaceFrame) * inverseTransformDirection(transformedNormal, viewMatrix);
       // Source-space height is stable across seating calibration, scale and
       // tuft displacement. Only the hidden base gets lining, never cushions.
       surfaceBaseHeight = position.y;
-      surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
-      surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));`);
+      surfacePosition = (surfaceFrame * modelMatrix * vec4(transformed, 1.0)).xyz;
+      surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), surfaceFrame * modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), surfaceFrame * modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), surfaceFrame * modelMatrix))));`);
     if (tuft) shader.vertexShader = shader.vertexShader
-      .replace("surfacePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;", "surfacePosition = tuftOriginalPosition;")
-      .replace("surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), modelMatrix))));", "surfaceNormal = tuftPanel;");
+      .replace("surfacePosition = (surfaceFrame * modelMatrix * vec4(transformed, 1.0)).xyz;", "surfacePosition = tuftOriginalPosition;")
+      .replace("surfaceNormal = normalize(vec3(dot(normal, inverseTransformDirection(vec3(1.0, 0.0, 0.0), surfaceFrame * modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 1.0, 0.0), surfaceFrame * modelMatrix)), dot(normal, inverseTransformDirection(vec3(0.0, 0.0, 1.0), surfaceFrame * modelMatrix))));", "surfaceNormal = tuftPanel;");
     shader.fragmentShader = `varying vec3 surfacePosition;
       varying vec3 surfaceNormal;
       varying vec3 surfaceFacingNormal;
       varying float surfaceBaseHeight;
+      uniform mat4 surfaceFrameWorld;
       uniform float surfaceDensity;
       vec4 surfaceSample(sampler2D tex, vec3 p) {
         vec3 weights = pow(abs(normalize(surfaceNormal)), vec3(6.0));
@@ -463,7 +471,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         float tpH1 = tuftPanelH(tpPanel, surfacePosition + tpE1 * tpStep, tpDetail, tpFp) - tuftPanelH(tpPanel, surfacePosition - tpE1 * tpStep, tpDetail, tpFp);
         float tpH2 = tuftPanelH(tpPanel, surfacePosition + tpE2 * tpStep, tpDetail, tpFp) - tuftPanelH(tpPanel, surfacePosition - tpE2 * tpStep, tpDetail, tpFp);
         vec3 tpGradWorld = (tpE1 * tpH1 + tpE2 * tpH2) / (2.0 * tpStep) * clamp(vTuftMask, 0.0, 1.0);
-        vec3 tpGrad = (viewMatrix * vec4(tpGradWorld, 0.0)).xyz * ${RELIEF.normalHeight.toFixed(4)} * ${scale.toFixed(6)};
+        vec3 tpGrad = (viewMatrix * surfaceFrameWorld * vec4(tpGradWorld, 0.0)).xyz * ${RELIEF.normalHeight.toFixed(4)} * ${scale.toFixed(6)};
         normal = normalize(normal - (tpGrad - dot(tpGrad, normal) * normal));
       `);
     }
@@ -505,7 +513,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v21-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}${directional ? "-dir" : ""}-soft${soften}`;
+  material.customProgramCacheKey = () => `physical-surface-v22-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}${directional ? "-dir" : ""}-soft${soften}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
@@ -803,7 +811,7 @@ function joinedModule(source: THREE.BufferGeometry) {
   return [reflectedGeometry(half), half];
 }
 
-function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wireframe }: { fabric: FabricId; leg: LegId; textureScale: number; scale: number; seats: SeatCount; reducedMotion: boolean; wireframe: boolean }) {
+function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wireframe, arPlacement }: { fabric: FabricId; leg: LegId; textureScale: number; scale: number; seats: SeatCount; reducedMotion: boolean; wireframe: boolean; arPlacement?: RefObject<THREE.Group | null> }) {
   const gl = useThree((state) => state.gl);
 
   const assembly = useRef<THREE.Group>(null);
@@ -900,7 +908,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const sy = BASE_SIZE.height / sourceSize.y * scale;
     const sz = BASE_SIZE.depth / sourceSize.z * scale;
     assembly.current.scale.set(sx, sy, sz);
-    assembly.current.position.set(-sourceCenter.x * sx, FLOOR_LIFT.studio - sourceBounds.min.y * sy, -sourceCenter.z * sz);
+    assembly.current.position.set(-sourceCenter.x * sx, (arPlacement ? FLOOR_LIFT.ar : FLOOR_LIFT.studio) - sourceBounds.min.y * sy, -sourceCenter.z * sz);
     assembly.current.visible = chairBlend < 0.999;
     if (chair.current) {
       chair.current.visible = chairBlend > 0.001;
@@ -912,6 +920,14 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       const chairSz = BASE_SIZE.depth / chairSize.z * scale * reveal;
       chair.current.scale.set(seatingWidth(1) / chairWidth * scale * reveal, chairSy, chairSz);
       chair.current.position.set(0, FLOOR_LIFT.studio - chairBounds.min.y * chairSy, -chairCenter.z * chairSz);
+    }
+    for (const material of [...materials, ...chairMaterials]) {
+      const shader = material.userData["surfaceShader"];
+      if (shader && arPlacement?.current) {
+        arPlacement.current.updateWorldMatrix(true, false);
+        shader.uniforms["surfaceFrame"].value.copy(arPlacement.current.matrixWorld).invert();
+        shader.uniforms["surfaceFrameWorld"].value.copy(arPlacement.current.matrixWorld);
+      }
     }
     for (const material of materials) {
       material.opacity = 1 - chairBlend;
@@ -1206,6 +1222,128 @@ function Viewer({ fabric, leg, textureScale, scale, grid, measures, unit, rotate
   );
 }
 
+
+export function ARCanvas({ session, fabric, leg, textureScale, surface, onPlaced, onScale, onError, onReady, resetSignal }: {
+  session: XRSession; fabric: FabricId; leg: LegId; textureScale: number;
+  surface: RefObject<HTMLDivElement | null>; onPlaced: (v: boolean) => void;
+  onScale: (v: number) => void; onError: (v: string) => void; onReady: () => void; resetSignal: number;
+}) {
+  return <Canvas shadows dpr={[1, 1.5]} camera={{ near: 0.05, far: 50 }}
+    gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true, toneMapping: THREE.NeutralToneMapping, toneMappingExposure: LIGHTING.exposure, outputColorSpace: THREE.SRGBColorSpace }}>
+    <LightRig />
+    <Suspense fallback={null}>
+      <ARScene session={session} fabric={fabric} leg={leg} textureScale={textureScale} surface={surface} onPlaced={onPlaced} onScale={onScale} onError={onError} onReady={onReady} resetSignal={resetSignal} />
+    </Suspense>
+  </Canvas>;
+}
+
+function ARScene({ session, fabric, leg, textureScale, surface, onPlaced, onScale, onError, onReady, resetSignal }: Parameters<typeof ARCanvas>[0]) {
+  const { gl, camera } = useThree();
+  const root = useRef<THREE.Group>(null);
+  const reticle = useRef<THREE.Mesh>(null);
+  const hitSource = useRef<XRHitTestSource | null>(null);
+  const placed = useRef(false);
+  const validHit = useRef(false);
+  const [scale, setScale] = useState(1);
+  const scaleRef = useRef(1);
+  const gesture = useRef<{ x: number; y: number; distance: number; angle: number; moved: boolean } | null>(null);
+  const floorPoint = useMemo(() => new THREE.Vector3(), []);
+  const floorRay = useMemo(() => new THREE.Raycaster(), []);
+  useEffect(() => { setScale(1); scaleRef.current = 1; onScale(1); }, [resetSignal, onScale]);
+  useEffect(() => {
+    let disposed = false;
+    gl.xr.enabled = true;
+    gl.xr.setReferenceSpaceType("local-floor");
+    gl.setClearColor(0, 0);
+    async function start() {
+      try {
+        await gl.xr.setSession(session);
+        if (disposed) return;
+        const viewer = await session.requestReferenceSpace("viewer");
+        const requestHit = session.requestHitTestSource;
+        if (!requestHit) throw new Error("Floor detection is unavailable on this phone.");
+        const source = await requestHit.call(session, { space: viewer });
+        if (disposed) { source?.cancel(); return; }
+        hitSource.current = source ?? null;
+        onReady();
+      } catch (error) { onError(error instanceof Error ? error.message : "Could not start floor detection."); void session.end().catch(() => {}); }
+    }
+    void start();
+    return () => { disposed = true; hitSource.current?.cancel(); hitSource.current = null; };
+  }, [gl, session, onError, onReady]);
+  useFrame((_, __, frame) => {
+    if (!frame || placed.current || !hitSource.current || !reticle.current) return;
+    const reference = gl.xr.getReferenceSpace();
+    if (!reference) return;
+    const pose = frame.getHitTestResults(hitSource.current).map(hit => hit.getPose(reference)).find(p => p && isARFloor(p.transform.matrix));
+    validHit.current = Boolean(pose);
+    reticle.current.visible = Boolean(pose);
+    if (pose) { reticle.current.matrix.fromArray(pose.transform.matrix); reticle.current.matrixWorldNeedsUpdate = true; }
+  });
+  useEffect(() => {
+    const element = surface.current;
+    if (!element) return;
+    function toFloor(x: number, y: number) {
+      if (!root.current) return null;
+      const xr = gl.xr.getCamera();
+      const eye = xr.cameras[0] ?? camera;
+      const rect = element?.getBoundingClientRect();
+      if (!rect || !rect.width || !rect.height) return null;
+      floorRay.setFromCamera(new THREE.Vector2((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1), eye);
+      const result = floorRay.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0), -root.current.position.y), floorPoint);
+      return result && floorRay.ray.origin.distanceTo(result) < 8 ? result.clone() : null;
+    }
+    const snapshot = (e: TouchEvent) => {
+      const a = e.touches[0], b = e.touches[1];
+      if (!a) return null;
+      return { x: b ? (a.clientX+b.clientX)/2 : a.clientX, y: b ? (a.clientY+b.clientY)/2 : a.clientY,
+        distance: b ? Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY) : 0,
+        angle: b ? Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX) : 0, moved: false };
+    };
+    const start = (e: TouchEvent) => { e.preventDefault(); gesture.current = snapshot(e); };
+    const move = (e: TouchEvent) => {
+      e.preventDefault(); const next = snapshot(e), previous = gesture.current;
+      if (!next || !previous || !placed.current || !root.current) return;
+      if (Boolean(next.distance) !== Boolean(previous.distance)) { gesture.current = next; return; }
+      const from = toFloor(previous.x, previous.y), to = toFloor(next.x, next.y);
+      if (from && to) { const delta = to.sub(from); if (delta.length() < 0.5) { root.current.position.x += delta.x; root.current.position.z += delta.z; } }
+      if (next.distance > 0 && previous.distance > 0) {
+        scaleRef.current = arScale(scaleRef.current * next.distance / previous.distance);
+        setScale(scaleRef.current); onScale(scaleRef.current);
+        root.current.rotation.y -= Math.atan2(Math.sin(next.angle-previous.angle),Math.cos(next.angle-previous.angle));
+      }
+      next.moved = previous.moved || Math.hypot(next.x-previous.x,next.y-previous.y) > 3 || next.distance > 0;
+      gesture.current = next;
+    };
+    const end = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length) { gesture.current = snapshot(e); return; }
+      if (!placed.current && validHit.current && root.current && reticle.current && !gesture.current?.moved) {
+        root.current.position.setFromMatrixPosition(reticle.current.matrix);
+        const gaze = gl.xr.getCamera().getWorldDirection(new THREE.Vector3());
+        root.current.rotation.y = Math.atan2(-gaze.x, -gaze.z);
+        root.current.visible = true; reticle.current.visible = false; placed.current = true; onPlaced(true);
+      }
+      gesture.current = null;
+    };
+    element.addEventListener("touchstart", start, { passive: false });
+    element.addEventListener("touchmove", move, { passive: false });
+    element.addEventListener("touchend", end, { passive: false });
+    element.addEventListener("touchcancel", end, { passive: false });
+    return () => { element.removeEventListener("touchstart",start); element.removeEventListener("touchmove",move); element.removeEventListener("touchend",end); element.removeEventListener("touchcancel",end); };
+  }, [surface, gl, camera, floorRay, floorPoint, onPlaced, onScale]);
+  return <>
+    <mesh ref={reticle} visible={false} matrixAutoUpdate={false}>
+      <ringGeometry args={[0.09,0.115,48]} onUpdate={geometry => geometry.rotateX(-Math.PI/2)} />
+      <meshBasicMaterial color={new THREE.Color(1, 1, 1)} opacity={0.9} transparent depthWrite={false} />
+    </mesh>
+    <group ref={root} visible={false}>
+      <SofaModel fabric={fabric} leg={leg} textureScale={textureScale} scale={scale} seats={2} reducedMotion wireframe={false} arPlacement={root} />
+      <SofaContactShadows seats={2} scale={scale} />
+    </group>
+  </>;
+}
+
 function ToolButton({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <Button type="button" variant={active ? "selected" : "outline"} size="icon" onClick={onClick} aria-label={label} aria-pressed={active} title={label}>
@@ -1260,7 +1398,7 @@ export function SofaConfigurator() {
         </div>
         <div className="hidden text-center md:block"><div className="text-xs font-semibold">Panache OPAA · {seats} seater</div><div className="mt-1 text-[10px] text-muted-foreground">{selectedFabric.name} · {selectedLeg.name}</div></div>
         <div className="pointer-events-auto flex items-center gap-2">
-          <ARButton seats={seats} />
+          <ARButton seats={seats} fabric={fabric} leg={leg} tile={textureScale} />
           <Button variant="outline" size="icon-sm" onClick={screenshot} aria-label="Download image" title="Download image"><Download className="size-4" /></Button>
           <Button variant="outline" size="icon-sm" onClick={fullscreen} aria-label="Fullscreen" title="Fullscreen"><Expand className="size-4" /></Button>
         </div>
