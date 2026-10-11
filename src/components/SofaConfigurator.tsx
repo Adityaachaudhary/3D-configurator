@@ -1235,6 +1235,7 @@ export function SofaConfigurator() {
   const [rotate, setRotate] = useState(false);
   const [studio, setStudio] = useState(true);
   const [wireframe, setWireframe] = useState(false);
+  const [priceOpen, setPriceOpen] = useState(false);
   const [unit, setUnit] = useState<Unit>("cm");
   const [view, setView] = useState<ViewName>("perspective");
   const [zoomSignal, setZoomSignal] = useState(0);
@@ -1354,16 +1355,20 @@ export function SofaConfigurator() {
         </div>
       </aside>
       <section aria-label="Price" className="absolute bottom-5 right-3 z-20 w-44 rounded-md border border-border/60 bg-surface p-3 shadow-panel sm:right-[calc(var(--panel-width)+1.25rem)]">
-        <h2 className="font-display text-[11px] font-semibold uppercase text-muted-foreground">Price</h2>
-        <dl className="mt-2 space-y-1 text-[11px] text-muted-foreground">
-          <div className="flex items-center justify-between"><dt>{seats} seater</dt><dd className="font-mono">{formatINR(seats * PRICE_PER_SEAT)}</dd></div>
-          <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedFabric.name}</dt><dd className="font-mono">{formatINR(fabricRate)}</dd></div>
-          <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedLeg.name}</dt><dd className="font-mono">{formatINR(PRICE_PER_LEG_FINISH)}</dd></div>
-        </dl>
-        <div className="mt-2 flex items-baseline justify-between border-t border-border/60 pt-2">
+        <div className="flex items-center justify-between">
           <span className="text-[11px] font-medium">Total</span>
-          <span className="font-display text-lg font-semibold">{formatINR(price)}</span>
+          <div className="flex items-center gap-1">
+            <span className="font-display text-lg font-semibold">{formatINR(price)}</span>
+            <Button variant="ghost" size="sm" type="button" aria-expanded={priceOpen} aria-label={priceOpen ? "Hide price breakdown" : "Show price breakdown"} onClick={() => setPriceOpen((open) => !open)} className="size-6 shrink-0 rounded-sm p-0"><ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", priceOpen && "rotate-180")} /></Button>
+          </div>
         </div>
+        {priceOpen && (
+          <dl className="mt-2 space-y-1 border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-between"><dt>{seats} seater</dt><dd className="font-mono">{formatINR(seats * PRICE_PER_SEAT)}</dd></div>
+            <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedFabric.name}</dt><dd className="font-mono">{formatINR(fabricRate)}</dd></div>
+            <div className="flex items-center justify-between"><dt className="max-w-[7.5rem] truncate">{selectedLeg.name}</dt><dd className="font-mono">{formatINR(PRICE_PER_LEG_FINISH)}</dd></div>
+          </dl>
+        )}
       </section>
       <div className="pointer-events-none absolute bottom-5 left-3 hidden items-center gap-2 rounded-md bg-surface/85 px-3 py-2 text-[10px] font-medium text-muted-foreground shadow-sm lg:flex"><Maximize2 className="size-3" /> Drag to orbit · scroll or pinch to zoom · right-drag to pan</div>
     </main>
