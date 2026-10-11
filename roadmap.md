@@ -124,3 +124,4 @@
 - [x] Verify displayed sizes still read 86.4 / 147.3 / 208.3 cm wide, 83.8 deep, 81.3 high.
 - [x] Live INR price card (mock rates: ₹150/seat, fabric ₹50/80/100, legs ₹100) — src/lib/pricing.ts + tested
 - [x] Move the price card to the bottom-right beside the sidebar; the orbit/zoom hint returns to the bottom-left.
+- [x] Reclassify Wisdom as a Pattern fabric (₹80) so its sidebar group and price category match; Solids keeps only the four ₹50 fabrics.
