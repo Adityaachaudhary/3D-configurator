@@ -1269,10 +1269,15 @@ function ARScene({ session, fabric, leg, textureScale, surface, onPlaced, onScal
       } catch (error) { onError(error instanceof Error ? error.message : "Could not start floor detection."); void session.end().catch(() => {}); }
     }
     void start();
-    return () => { disposed = true; hitSource.current?.cancel(); hitSource.current = null; };
+    return () => {
+      disposed = true;
+      hitSource.current?.cancel(); hitSource.current = null;
+      gl.xr.enabled = false;
+      if (session.visibilityState !== "hidden") void session.end().catch(() => {});
+    };
   }, [gl, session, onError, onReady]);
   useFrame((_, __, frame) => {
-    if (!frame || placed.current || !hitSource.current || !reticle.current) return;
+    if (!frame || !gl.xr.isPresenting || placed.current || !hitSource.current || !reticle.current) return;
     const reference = gl.xr.getReferenceSpace();
     if (!reference) return;
     const pose = frame.getHitTestResults(hitSource.current).map(hit => hit.getPose(reference)).find(p => p && isARFloor(p.transform.matrix));
@@ -1303,7 +1308,12 @@ function ARScene({ session, fabric, leg, textureScale, surface, onPlaced, onScal
     const start = (e: TouchEvent) => { e.preventDefault(); gesture.current = snapshot(e); };
     const move = (e: TouchEvent) => {
       e.preventDefault(); const next = snapshot(e), previous = gesture.current;
-      if (!next || !previous || !placed.current || !root.current) return;
+      if (!next || !previous) return;
+      if (!placed.current || !root.current) {
+        next.moved = previous.moved || Math.hypot(next.x-previous.x,next.y-previous.y) > 3 || next.distance > 0;
+        gesture.current = next;
+        return;
+      }
       if (Boolean(next.distance) !== Boolean(previous.distance)) { gesture.current = next; return; }
       const from = toFloor(previous.x, previous.y), to = toFloor(next.x, next.y);
       if (from && to) { const delta = to.sub(from); if (delta.length() < 0.5) { root.current.position.x += delta.x; root.current.position.z += delta.z; } }
@@ -1318,7 +1328,7 @@ function ARScene({ session, fabric, leg, textureScale, surface, onPlaced, onScal
     const end = (e: TouchEvent) => {
       e.preventDefault();
       if (e.touches.length) { gesture.current = snapshot(e); return; }
-      if (!placed.current && validHit.current && root.current && reticle.current && !gesture.current?.moved) {
+      if (e.type !== "touchcancel" && gesture.current && !placed.current && validHit.current && root.current && reticle.current && !gesture.current.moved) {
         root.current.position.setFromMatrixPosition(reticle.current.matrix);
         const gaze = gl.xr.getCamera().getWorldDirection(new THREE.Vector3());
         root.current.rotation.y = Math.atan2(-gaze.x, -gaze.z);
