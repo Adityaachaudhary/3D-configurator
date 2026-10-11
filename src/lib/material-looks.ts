@@ -78,7 +78,7 @@ const PATTERN: Partial<MaterialLook> = { sheen: 0.2, sheenRoughness: 0.6, sheenG
 
 const OVERRIDES: Record<string, Partial<MaterialLook>> = {
   // Solids
-  oat: { roughness: 1, sheen: 0.3, sheenRoughness: 0.6, sheenTint: 0.15, bumpScale: 0.9, normalSoften: 0.1 },
+  oat: { roughness: 1, sheen: 0.3, sheenRoughness: 0.6, sheenTint: 0.15, bumpScale: 2.5, normalSoften: 0.1 },
   clay: { roughness: 0.93, sheen: 0.35, sheenTint: 0.15, bumpScale: 2.2 },
   moss: { roughness: 0.95, sheen: 0.7, sheenRoughness: 0.45, sheenTint: 0.2, bumpScale: 2 },
   ink: { roughness: 0.85, sheen: 1, sheenRoughness: 0.3, sheenTint: 0.14, bumpScale: 0 },
