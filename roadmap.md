@@ -126,3 +126,9 @@
 - [x] Move the price card to the bottom-right beside the sidebar; the orbit/zoom hint returns to the bottom-left.
 - [x] Reclassify Wisdom as a Pattern fabric (₹80) so its sidebar group and price category match; Solids keeps only the four ₹50 fabrics.
 - [x] Remove Ochre Chevron and its related code (preset, FabricId, chevron pattern kind and drawing formula, material-looks override and tile entry, CSS pattern tokens, test entries); 13 fabrics remain, type check clean and 35 tests pass.
+## Android AR
+- [ ] Reuse the configurator's two-seater geometry, materials and renderer in immersive AR.
+- [ ] Add floor-only placement, floor-preserving move/rotate/pinch, finish selection and live price.
+- [ ] Add laptop QR sharing of selected finishes and Android support/error states.
+- [ ] Verify rules, normal viewer, QR and simulated XR controls.
+- [ ] Verify physical floor tracking and material fidelity on the user's Android phone (requires device).
