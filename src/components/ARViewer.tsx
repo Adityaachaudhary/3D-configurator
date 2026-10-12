@@ -32,9 +32,6 @@ export type FabricId =
   | "clay"
   | "ink"
   | "moss"
-  | "swatch-urban"
-  | "red-fish"
-  | "orange-pattern"
   | "cognac-leather"
   | "charcoal-leather"
   | "olive-leather"
@@ -68,9 +65,6 @@ export const AR_FABRICS: FabricPreset[] = [
   { id: "clay", name: "Clay Twill", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", color: "#46564b", weave: "loop" },
   { id: "ink", name: "Ink Velvet", color: "#34383b", weave: "velvet" },
-  { id: "swatch-urban", name: "Swatch Urban", color: "#8a8680", weave: "tweed", printed: true },
-  { id: "red-fish", name: "Red Fish", color: "#b44646", weave: "linen", printed: true },
-  { id: "orange-pattern", name: "Orange Pattern", color: "#d28c50", weave: "twill", printed: true },
   { id: "cognac-leather", name: "Cognac Leather", color: "#8b5e3c", weave: "leather" },
   { id: "charcoal-leather", name: "Charcoal Leather", color: "#3a3a3a", weave: "leather" },
   { id: "olive-leather", name: "Olive Leather", color: "#5a6645", weave: "leather" },
@@ -104,8 +98,9 @@ export function isARLaunch(): boolean {
 }
 
 function buildARUrl(): string {
-  const { protocol, hostname, port, pathname } = window.location;
-  return `${protocol}//${hostname}${port ? `:${port}` : ""}${pathname}?ar=1`;
+  const url = new URL(window.location.href);
+  url.searchParams.set("ar", "1");
+  return url.toString();
 }
 
 function isMobileAndroid(): boolean {

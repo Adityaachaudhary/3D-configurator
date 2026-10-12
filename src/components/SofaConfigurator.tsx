@@ -40,9 +40,9 @@ import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/te
 import { PRICE_PER_SEAT, fabricPrice, legFinishPrice, totalPrice, formatINR } from "@/lib/pricing";
 import { configureModelLoaders } from "@/lib/ktx2-loader";
 
-type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
+type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "check" | "diamond";
-type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; printed?: boolean; tufted?: boolean; photo?: string; directional?: boolean };
+type FabricPreset = { id: FabricId; name: string; family: string; color: string; weave: string; pattern?: PatternKind; printed?: boolean; tufted?: boolean; photo?: string };
 type LegId = "oak" | "walnut" | "ebonized" | "steel";
 type Unit = "cm" | "mm" | "in";
 type ViewName = "perspective" | "front" | "side" | "rear";
@@ -67,9 +67,6 @@ const FABRICS: FabricPreset[] = [
   { id: "clay", name: "Clay Twill", family: "Twill 07", color: "#a66f5b", weave: "twill" },
   { id: "moss", name: "Forest Chenille", family: "Chenille 09", color: "#46564b", weave: "loop" },
   { id: "ink", name: "Ink Velvet", family: "Velvet 02", color: "#34383b", weave: "velvet" },
-  { id: "swatch-urban", name: "Swatch Urban", family: "Client fabric · Textured tweed", color: "#8a8680", weave: "tweed", printed: true },
-  { id: "red-fish", name: "Red Fish", family: "Client fabric · Printed", color: "#b44646", weave: "linen", printed: true },
-  { id: "orange-pattern", name: "Orange Pattern", family: "Client fabric · Woven stripe", color: "#d28c50", weave: "twill", printed: true, directional: true },
   { id: "cognac-leather", name: "Cognac Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "charcoal-leather", name: "Charcoal Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
   { id: "olive-leather", name: "Olive Leather", family: "Leather · Fine grain", color: "", weave: "leather" },
@@ -161,13 +158,13 @@ function createSurfaceMaps(kind: string) {
 
 // Mirror a square crop without stretching its threads. Opposing edges match,
 // avoiding hard photo borders across cushions and derived seating modules.
-function createPhotoSurfaceMaps(source: HTMLImageElement, cropPixels?: number, reliefStrength = 0.45) {
+function createPhotoSurfaceMaps(source: HTMLImageElement, reliefStrength = 0.45) {
   const size = 1024;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return createSurfaceMaps("linen");
-  const crop = Math.min(source.naturalWidth, source.naturalHeight, cropPixels ?? Infinity);
+  const crop = Math.min(source.naturalWidth, source.naturalHeight);
   for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) {
     ctx.save();
     ctx.translate(x ? size : 0, y ? size : 0);
@@ -178,36 +175,17 @@ function createPhotoSurfaceMaps(source: HTMLImageElement, cropPixels?: number, r
   const pixels = ctx.getImageData(0, 0, size, size).data;
   const relief = new Uint8Array(pixels.length);
   const roughness = new Uint8Array(pixels.length);
-  // Strong-relief (tweed) photos get a synthetic woven crosshatch on top of the
-  // photo-derived slub relief: the flat photo luminance alone reads as smooth.
-  const tweed = reliefStrength > 0.6;
   for (let i = 0; i < pixels.length; i += 4) {
-    const pixel = i / 4;
-    const px = pixel % size, py = Math.floor(pixel / size);
     const luminance = (pixels[i] ?? 0) * 0.2126 + (pixels[i + 1] ?? 0) * 0.7152 + (pixels[i + 2] ?? 0) * 0.0722;
-    let height = 128 + (luminance - 128) * reliefStrength;
-    if (tweed) {
-      const u = px / size * Math.PI * 2, v = py / size * Math.PI * 2;
-      // Rounded warp/weft yarns, ~48 per tile, with a broken-twill interlace
-      // and slub speckle so the weave reads at normal viewing distance.
-      const warp = Math.pow(0.5 + 0.5 * Math.cos(u * 48), 1.5);
-      const weft = Math.pow(0.5 + 0.5 * Math.cos(v * 48), 1.5);
-      const over = Math.sin(u * 6 + Math.sin(v * 3)) * Math.sin(v * 6 + Math.cos(u * 5)) > 0;
-      const slub = Math.sin(u * 173 + Math.sin(v * 91)) * Math.sin(v * 167 + Math.cos(u * 71));
-      height = height * 0.45 + (over ? warp : weft) * 118 + Math.max(warp, weft) * 22 + slub * 14;
-      // Thread gaps darken the photo slightly so the weave shows in colour too.
-      const gap = 1 - Math.max(warp, weft) * 0.16;
-      for (let k = 0; k < 3; k++) pixels[i + k] = Math.round(THREE.MathUtils.clamp((pixels[i + k] ?? 0) * gap, 0, 255));
-    }
-    const heightByte = Math.round(THREE.MathUtils.clamp(height, 0, 255));
+    const heightByte = Math.round(
+      THREE.MathUtils.clamp(128 + (luminance - 128) * reliefStrength, 0, 255),
+    );
     for (let k = 0; k < 3; k++) {
       relief[i + k] = heightByte;
-      // Raised slub yarns catch light slightly; recessed gaps stay fully matte.
-      roughness[i + k] = Math.round(THREE.MathUtils.clamp(tweed ? 255 - heightByte * 0.18 : 245 - heightByte * 0.04, 0, 255));
+      roughness[i + k] = Math.round(THREE.MathUtils.clamp(245 - heightByte * 0.04, 0, 255));
     }
     relief[i + 3] = roughness[i + 3] = 255;
   }
-  if (tweed) ctx.putImageData(new ImageData(new Uint8ClampedArray(pixels.buffer.slice(0)), size, size), 0, 0);
   const configure = (texture: THREE.Texture, colorSpace: typeof THREE.SRGBColorSpace | typeof THREE.NoColorSpace) => {
     texture.colorSpace = colorSpace;
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -322,7 +300,7 @@ const tuftProfileGLSL = `
   }
 `;
 
-function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null, patternRepeat = density * (8 / 5.6), tuft = false, undersideColor: THREE.Color | null = null, photo = false, soften = 0, directional = false) {
+function projectSurface(material: THREE.MeshStandardMaterial, density: number, scale: number, pattern: THREE.Texture | null = null, patternRepeat = density * (8 / 5.6), tuft = false, undersideColor: THREE.Color | null = null, photo = false, soften = 0) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms["surfaceDensity"] = { value: density / scale };
     if (undersideColor) shader.uniforms["undersideColor"] = { value: undersideColor };
@@ -401,7 +379,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
         vec3 tileP = p * surfaceDensity;
         ${photo ? `// Distinct cutting phases/quarter-turn for arms, seats and back.
         // All three photo maps use these same coordinates; never offset by module.
-        vec2 armUV = ${directional ? "tileP.zy" : "vec2(-tileP.y, tileP.z)"} + vec2(0.37, 0.19);
+        vec2 armUV = vec2(-tileP.y, tileP.z) + vec2(0.37, 0.19);
         vec2 seatUV = tileP.xz + vec2(0.11, 0.43);
         vec2 backUV = tileP.xy + vec2(0.61, 0.07);` : `vec2 armUV = tileP.yz;
         vec2 seatUV = tileP.xz;
@@ -507,7 +485,7 @@ function projectSurface(material: THREE.MeshStandardMaterial, density: number, s
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdx ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdx).x`)
       .replace("texture2D( bumpMap, vBumpMapUv + dSTdy ).x", `${tuft ? "surfaceRelief" : "surfaceSample"}(bumpMap, surfacePosition + dSTdy).x`);
   };
-  material.customProgramCacheKey = () => `physical-surface-v21-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}${directional ? "-dir" : ""}-soft${soften}`;
+  material.customProgramCacheKey = () => `physical-surface-v21-panel-analytic-${density}-${patternRepeat}-${scale}-${pattern?.uuid ?? "plain"}-${tuft ? "tufted" : "smooth"}-${photo ? "photo-panels" : "standard"}-${undersideColor ? "lined" : "unlined"}-soft${soften}`;
 }
 
 function splitSofaGeometry(source: THREE.BufferGeometry) {
@@ -958,8 +936,8 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   }, [selectedFabric]);
   useEffect(() => () => patternTexture?.dispose(), [patternTexture]);
   const fabricTexture = useMemo(
-    () => selectedFabric.photo ? createPhotoSurfaceMaps(fabricPhoto.image as HTMLImageElement, selectedFabric.id === "red-fish" ? 128 : undefined, selectedFabric.weave === "tweed" ? 1.1 : 0.45) : createSurfaceMaps(selectedFabric.weave),
-    [selectedFabric.id, selectedFabric.weave, selectedFabric.photo, fabricPhoto],
+    () => selectedFabric.photo ? createPhotoSurfaceMaps(fabricPhoto.image as HTMLImageElement) : createSurfaceMaps(selectedFabric.weave),
+    [selectedFabric.weave, selectedFabric.photo, fabricPhoto],
   );
   const legTexture = useMemo(() => createSurfaceMaps(leg === "steel" ? "steel" : "wood"), [leg]);
   useEffect(() => () => Object.values(fabricTexture).forEach((map) => map.dispose()), [fabricTexture]);
@@ -1010,7 +988,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
       undersideColor.setRGB((rgb[0] ?? 0) / 255, (rgb[1] ?? 0) / 255, (rgb[2] ?? 0) / 255, THREE.SRGBColorSpace);
     }
     upholstery.userData["undersideColor"] = undersideColor;
-    projectSurface(upholstery, leather ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale), scale, patternTexture, tileDensity(textureScale), selectedFabric.tufted ?? false, undersideColor, Boolean(selectedFabric.photo), look.normalSoften, Boolean(selectedFabric.directional));
+    projectSurface(upholstery, leather ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale), scale, patternTexture, tileDensity(textureScale), selectedFabric.tufted ?? false, undersideColor, Boolean(selectedFabric.photo), look.normalSoften);
     projectSurface(feet, leg === "steel" ? 3 : 1.6, scale);
     return [upholstery, feet];
   }, [fabricTexture, legTexture, selectedFabric, selectedLeg, textureScale, scale, leg, patternTexture, leather]);
@@ -1018,7 +996,7 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
     const clone = material.clone();
     const lining = material.userData["undersideColor"];
     const soften = i === 0 ? Number(material.userData["normalSoften"] ?? 0) : 0;
-    projectSurface(clone, i === 0 ? selectedFabric.weave === "leather" ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale) : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null, tileDensity(textureScale), i === 0 && Boolean(selectedFabric.tufted), i === 0 && lining instanceof THREE.Color ? lining : null, i === 0 && Boolean(selectedFabric.photo), soften, i === 0 && Boolean(selectedFabric.directional));
+    projectSurface(clone, i === 0 ? selectedFabric.weave === "leather" ? leatherDensity(textureScale) : selectedFabric.photo ? tileDensity(textureScale) : weaveDensity(textureScale) : leg === "steel" ? 3 : 1.6, scale, i === 0 ? patternTexture : null, tileDensity(textureScale), i === 0 && Boolean(selectedFabric.tufted), i === 0 && lining instanceof THREE.Color ? lining : null, i === 0 && Boolean(selectedFabric.photo), soften);
     return clone;
   }), [materials, textureScale, leg, scale, patternTexture, selectedFabric]);
   useEffect(() => () => chairMaterials.forEach((material) => material.dispose()), [chairMaterials]);

@@ -27,7 +27,6 @@ describe("pricing (mock INR rates)", () => {
   it("prices pattern and photo fabrics at 80", () => {
     expect(fabricPrice({ weave: "twill", pattern: "check" })).toBe(80);
     expect(fabricPrice({ weave: "linen", photo: "x.png" })).toBe(80);
-    expect(fabricPrice({ weave: "tweed", printed: true, photo: "x.png" })).toBe(80);
   });
 
   it("prices leather fabrics at 100", () => {
