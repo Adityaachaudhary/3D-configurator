@@ -177,7 +177,7 @@ Colours: the `color` field is mostly a fallback. The real colour of solids/leath
 
 ## 7. Model loading and fabric/leg separation
 
-1. `useGLTF(sofaAsset.url)` loads the optimized GLB (preloaded at module load). The first `Mesh` found by traversal is used.
+1. `useGLTF(sofaAsset.url)` configures Draco, Meshopt, and KTX2 before loading the optimized GLB. The KTX2 Basis and Draco decoders are self-hosted in `public/basis` and `public/draco`; renderer-specific KTX2 support is detected before each load. On the AR launch screen, the model download and Draco decoder warm up before session entry. AR reports loading readiness and performs its leg/material geometry split in a worker to avoid blocking the phone's UI thread. The first `Mesh` found by traversal is used.
 2. `splitSofaGeometry` (clone of the source geometry):
    - Union-find over the index buffer + welding of vertices with equal positions (`toFixed(5)`) to compute connected components (component bounds are computed; kept for diagnostics).
    - **Leg axes**: for each quadrant (±x, ±z) average x/z of vertices with `y < −0.37`, `|x| > 0.7`, `|z| > 0.2`.

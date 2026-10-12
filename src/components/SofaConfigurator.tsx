@@ -22,8 +22,9 @@ import Rotate3D from "lucide-react/dist/esm/icons/rotate-3d";
 import Ruler from "lucide-react/dist/esm/icons/ruler";
 import Scan from "lucide-react/dist/esm/icons/scan";
 import SunMedium from "lucide-react/dist/esm/icons/sun-medium";
-import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import * as THREE from "three";
+import type { GLTFLoader } from "three-stdlib";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 import sofaAsset from "@/assets/Panache-OPAA-80pct.glb.asset.json";
@@ -37,6 +38,7 @@ import { seatingWidth, BASE_SIZE, FLOOR_LIFT } from "@/lib/sofa-spec";
 import { LightRig } from "@/lib/static-light-rig";
 import { DEFAULT_TILE_CM, MIN_TILE_CM, MAX_TILE_CM, tileDensity } from "@/lib/texture-repeat";
 import { PRICE_PER_SEAT, fabricPrice, legFinishPrice, totalPrice, formatINR } from "@/lib/pricing";
+import { configureModelLoaders } from "@/lib/ktx2-loader";
 
 type FabricId = "oat" | "wisdom" | "clay" | "ink" | "moss" | "swatch-urban" | "red-fish" | "orange-pattern" | "cognac-leather" | "charcoal-leather" | "olive-leather" | "chesterfield-oxblood" | "chesterfield-saddle";
 type PatternKind = "check" | "diamond";
@@ -809,7 +811,8 @@ function SofaModel({ fabric, leg, textureScale, scale, seats, reducedMotion, wir
   const assembly = useRef<THREE.Group>(null);
   const chair = useRef<THREE.Group>(null);
   const animatedSeats = useRef<number>(2);
-  const { scene } = useGLTF(sofaAsset.url);
+  const extendLoader = useCallback((loader: GLTFLoader) => configureModelLoaders(loader, gl), [gl]);
+  const { scene } = useGLTF(sofaAsset.url, true, true, extendLoader);
   const sourceMesh = useMemo(() => {
     let found: THREE.Mesh | undefined;
     scene.traverse((object: THREE.Object3D) => {
@@ -1370,5 +1373,3 @@ export function SofaConfigurator() {
 function Metric({ label, value, unit }: { label: string; value: number; unit: Unit }) {
   return <div className="rounded-sm border border-border/40 bg-muted/70 px-1.5 py-2.5"><div className="text-[9px] font-semibold uppercase text-muted-foreground">{label}</div><div className="mt-1 font-mono text-[11px] font-semibold tabular-nums">{formatDimension(value, unit)}</div></div>;
 }
-
-useGLTF.preload(sofaAsset.url);

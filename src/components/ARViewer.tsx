@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { GLTFLoader } from "three-stdlib";
 import QRCode from "qrcode";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import X from "lucide-react/dist/esm/icons/x";
@@ -18,9 +18,10 @@ import {
   createSurfaceMaps,
   isFloorSurfaceTransform,
   projectSurface,
-  splitSofaGeometry,
+  splitSofaGeometryAsync,
 } from "@/lib/ar-surface";
 import { DEFAULT_TILE_CM, tileDensity } from "@/lib/texture-repeat";
+import { configureModelLoaders, preloadARAssets } from "@/lib/ktx2-loader";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -278,6 +279,9 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
   const [fabric, setFabric] = useState<FabricId>("oat");
   const [leg, setLeg] = useState<LegId>("oak");
   const [placed, setPlaced] = useState(false);
+  const [modelReady, setModelReady] = useState(false);
+  const [modelProgress, setModelProgress] = useState<number | null>(null);
+  const [modelError, setModelError] = useState<string | null>(null);
   const [userScale, setUserScale] = useState(1);
   const [fabricOpen, setFabricOpen] = useState(false);
   const [legOpen, setLegOpen] = useState(false);
@@ -483,17 +487,48 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
     reticleRef.current = reticle;
 
     // load sofa
-    new GLTFLoader().load("/Panache-OPAA-optimized.glb", (gltf) => {
-      const sofa = gltf.scene;
-      sofaRef.current = sofa;
-      sourceBoundsRef.current = new THREE.Box3().setFromObject(sofa);
-      scaleSofa(sofa, sourceBoundsRef.current, 1);
-      sofa.visible = false;
-      threeScene.add(sofa);
-      const mats = buildMaterials("oat", "oak");
-      matRef.current = mats;
-      applyMaterials(sofa, mats.upholstery, mats.feet);
-    });
+    const gltfLoader = new GLTFLoader();
+    configureModelLoaders(gltfLoader, renderer);
+    gltfLoader.load(
+      "/Panache-OPAA-optimized.glb",
+      async (gltf) => {
+        try {
+          const sofa = gltf.scene;
+          sofaRef.current = sofa;
+          sourceBoundsRef.current = new THREE.Box3().setFromObject(sofa);
+          scaleSofa(sofa, sourceBoundsRef.current, 1);
+          sofa.visible = false;
+          threeScene.add(sofa);
+
+          setModelProgress(null);
+          let mesh: THREE.Mesh | undefined;
+          sofa.traverse((object) => {
+            if (!mesh && object instanceof THREE.Mesh) mesh = object;
+          });
+          if (!mesh) throw new Error("The loaded sofa model contains no mesh");
+          const splitGeometry = await splitSofaGeometryAsync(mesh.geometry);
+          mesh.geometry.dispose();
+          mesh.geometry = splitGeometry;
+          const mats = buildMaterials("oat", "oak");
+          matRef.current = mats;
+          applyMaterials(sofa, mats.upholstery, mats.feet);
+          setModelReady(true);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error("Failed to prepare the AR sofa:", error);
+          setModelError(message);
+        }
+      },
+      (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          setModelProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      },
+      (error) => {
+        console.error("Failed to load the AR sofa model:", error);
+        setModelError("Could not load the sofa model. Check your connection and try again.");
+      },
+    );
 
     async function startXR() {
       // The reference space must be selected before entering the XR session.
@@ -586,7 +621,7 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
   const handleTap = useCallback((e: React.MouseEvent) => {
     // ignore taps on the UI panel
     if ((e.target as HTMLElement).closest("[data-ar-ui]")) return;
-    if (placedRef.current || !reticleRef.current?.visible || !sofaRef.current) return;
+    if (!modelReady || placedRef.current || !reticleRef.current?.visible || !sofaRef.current) return;
     // place sofa at reticle position, floor-aligned
     const pos = new THREE.Vector3();
     const quat = new THREE.Quaternion();
@@ -639,7 +674,7 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
     setPlaced(true);
     hitSrcRef.current?.cancel();
     hitSrcRef.current = null;
-  }, []);
+  }, [modelReady]);
 
   const exitAR = useCallback(() => {
     void session.end().catch(() => {});
@@ -662,7 +697,13 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
         className="pointer-events-auto absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-black/50 px-4 py-3"
       >
         <span className="text-xs font-semibold text-white">
-          {placed ? "Panache · 2 seater" : "Point at floor · tap to place"}
+          {placed
+            ? "Panache · 2 seater"
+            : modelError
+              ? "Sofa unavailable"
+              : modelReady
+                ? "Point at floor · tap to place"
+                : `Preparing sofa${modelProgress === null ? "…" : ` · ${modelProgress}%`}`}
         </span>
         <button
           onClick={exitAR}
@@ -671,6 +712,16 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
           <X className="size-4 text-white" />
         </button>
       </div>
+
+      {!modelReady && (
+        <div
+          data-ar-ui
+          role={modelError ? "alert" : "status"}
+          className="pointer-events-none absolute inset-x-6 top-1/2 z-10 -translate-y-1/2 rounded-xl bg-black/65 px-4 py-3 text-center text-sm text-white"
+        >
+          {modelError ?? `Preparing sofa${modelProgress === null ? "…" : ` · ${modelProgress}%`}`}
+        </div>
+      )}
 
       {placed && (
         <div
@@ -803,6 +854,7 @@ export function ARLaunchScreen() {
   const [diag, setDiag] = useState<string[]>([]);
 
   useEffect(() => {
+    preloadARAssets();
     const lines: string[] = [];
     lines.push(`UA: ${navigator.userAgent.slice(0, 120)}`);
     lines.push(`navigator.xr: ${String(navigator.xr)}`);

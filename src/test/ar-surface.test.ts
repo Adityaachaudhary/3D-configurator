@@ -7,6 +7,7 @@ import {
   projectSurface,
   splitSofaGeometry,
 } from "@/lib/ar-surface";
+import { splitARIndices } from "@/lib/ar-geometry";
 
 describe("AR sofa geometry", () => {
   it("keeps the full sofa bounds on the supplied floor while repositioning", () => {
@@ -82,10 +83,16 @@ describe("AR sofa geometry", () => {
     source.setIndex(indices);
 
     const split = splitSofaGeometry(source);
+    const splitAsyncIndices = splitARIndices(
+      source.getAttribute("position").array as Float32Array,
+      Uint32Array.from(source.index!.array),
+    );
     expect(split.groups).toEqual([
       { start: 0, count: 3, materialIndex: 0 },
       { start: 3, count: 24, materialIndex: 1 },
     ]);
+    expect(splitAsyncIndices.upholsteryIndexCount).toBe(3);
+    expect(Array.from(splitAsyncIndices.indices)).toEqual(Array.from(split.index!.array));
     expect(split.userData["arMaterialGroups"]).toBe(true);
 
     source.dispose();

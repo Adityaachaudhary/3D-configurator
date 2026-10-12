@@ -328,3 +328,46 @@ export function splitSofaGeometry(source: THREE.BufferGeometry) {
   geometry.userData["arMaterialGroups"] = true;
   return geometry;
 }
+
+export function splitSofaGeometryAsync(source: THREE.BufferGeometry): Promise<THREE.BufferGeometry> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL("../workers/ar-geometry.worker.ts", import.meta.url), {
+      type: "module",
+    });
+    const position = source.getAttribute("position");
+    const positions = new Float32Array(position.array as ArrayLike<number>);
+    const sourceIndex = source.index?.array;
+    const indices = sourceIndex
+      ? Uint32Array.from(sourceIndex)
+      : Uint32Array.from({ length: position.count }, (_, index) => index);
+
+    worker.onmessage = (
+      event: MessageEvent<{ indices?: ArrayBuffer; upholsteryIndexCount?: number; error?: string }>,
+    ) => {
+      worker.terminate();
+      if (!event.data.indices || event.data.upholsteryIndexCount === undefined) {
+        reject(new Error(event.data.error ?? "Failed to split AR sofa geometry"));
+        return;
+      }
+      const geometry = source.clone();
+      const splitIndices = source.getAttribute("position").count <= 65_535
+        ? new Uint16Array(event.data.indices)
+        : new Uint32Array(event.data.indices);
+      geometry.setIndex(new THREE.BufferAttribute(splitIndices, 1));
+      geometry.clearGroups();
+      geometry.addGroup(0, event.data.upholsteryIndexCount, 0);
+      geometry.addGroup(
+        event.data.upholsteryIndexCount,
+        splitIndices.length - event.data.upholsteryIndexCount,
+        1,
+      );
+      geometry.userData["arMaterialGroups"] = true;
+      resolve(geometry);
+    };
+    worker.onerror = (event) => {
+      worker.terminate();
+      reject(new Error(`AR sofa geometry worker failed: ${event.message}`));
+    };
+    worker.postMessage({ positions, indices }, [positions.buffer, indices.buffer]);
+  });
+}
