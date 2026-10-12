@@ -7,6 +7,7 @@ import X from "lucide-react/dist/esm/icons/x";
 import Check from "lucide-react/dist/esm/icons/check";
 import ScanLine from "lucide-react/dist/esm/icons/scan-line";
 import Smartphone from "lucide-react/dist/esm/icons/smartphone";
+import Move from "lucide-react/dist/esm/icons/move";
 
 import { cn } from "@/lib/utils";
 import { BASE_SIZE, seatingWidth } from "@/lib/sofa-spec";
@@ -14,7 +15,6 @@ import { totalPrice, formatINR } from "@/lib/pricing";
 import { materialRecipe } from "@/lib/material-recipes";
 import { applyLook, resolveLook, LEG_BUMP, tileFor } from "@/lib/material-looks";
 import {
-  alignToFloor,
   createSurfaceMaps,
   isFloorSurfaceTransform,
   projectSurface,
@@ -100,9 +100,16 @@ export function isARLaunch(): boolean {
   return new URLSearchParams(window.location.search).get("ar") === "1";
 }
 
-function buildARUrl(): string {
+export function buildARUrl(fabricId?: FabricId, legId?: LegId): string {
   const { protocol, hostname, port, pathname } = window.location;
-  return `${protocol}//${hostname}${port ? `:${port}` : ""}${pathname}?ar=1`;
+  const secureProtocol =
+    protocol === "http:" && !hostname.includes("localhost") && !hostname.startsWith("127.")
+      ? "https:"
+      : protocol;
+  const params = new URLSearchParams({ ar: "1" });
+  if (fabricId) params.set("fabric", fabricId);
+  if (legId) params.set("leg", legId);
+  return `${secureProtocol}//${hostname}${port ? `:${port}` : ""}${pathname}?${params.toString()}`;
 }
 
 function isMobileAndroid(): boolean {
@@ -187,9 +194,17 @@ function scaleSofa(scene: THREE.Group, sourceBounds: THREE.Box3, userScale = 1) 
 
 // ─── QR modal ─────────────────────────────────────────────────────────────────
 
-function QRModal({ onClose }: { onClose: () => void }) {
+function QRModal({
+  onClose,
+  fabric = "oat",
+  leg = "oak",
+}: {
+  onClose: () => void;
+  fabric?: FabricId;
+  leg?: LegId;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const url = buildARUrl();
+  const url = buildARUrl(fabric, leg);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -250,10 +265,13 @@ function QRModal({ onClose }: { onClose: () => void }) {
 interface AROverlayProps {
   session: XRSession;
   onEnd: () => void;
+  initialFabric?: FabricId;
+  initialLeg?: LegId;
 }
 
-function AROverlay({ session, onEnd }: AROverlayProps) {
+function AROverlay({ session, onEnd, initialFabric = "oat", initialLeg = "oak" }: AROverlayProps) {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const pivotRef = useRef<THREE.Group | null>(null);   // pivot: placed at floor hit, sofa Y-offset inside
   const sofaRef = useRef<THREE.Group | null>(null);
   const sourceBoundsRef = useRef<THREE.Box3 | null>(null);
   const hitSrcRef = useRef<XRHitTestSource | null>(null);
@@ -274,11 +292,14 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
   const floorYRef = useRef<number | null>(null);
   const manualOffsetRef = useRef(new THREE.Vector3());
   const rotationRef = useRef(0);
+  const elevationRef = useRef(0);
+  const lastTapTimeRef = useRef(0);
 
-  const [fabric, setFabric] = useState<FabricId>("oat");
-  const [leg, setLeg] = useState<LegId>("oak");
+  const [fabric, setFabric] = useState<FabricId>(initialFabric);
+  const [leg, setLeg] = useState<LegId>(initialLeg);
   const [placed, setPlaced] = useState(false);
   const [userScale, setUserScale] = useState(1);
+  const [elevation, setElevation] = useState(0); // elevation in meters relative to floor
   const [fabricOpen, setFabricOpen] = useState(false);
   const [legOpen, setLegOpen] = useState(false);
 
@@ -295,14 +316,66 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
     applyMaterials(sofaRef.current, mats.upholstery, mats.feet);
   }, [fabric, leg]);
 
+  const adjustElevation = useCallback((deltaM: number) => {
+    setElevation((prev) => {
+      const next = THREE.MathUtils.clamp(prev + deltaM, -0.4, 0.6);
+      elevationRef.current = next;
+      // Directly update pivot Y — no bounds-based math needed
+      if (pivotRef.current) {
+        pivotRef.current.position.y = (floorYRef.current ?? 0) + next;
+      }
+      return next;
+    });
+  }, []);
+
+  const resetElevation = useCallback(() => {
+    setElevation(0);
+    elevationRef.current = 0;
+    if (pivotRef.current) {
+      pivotRef.current.position.y = floorYRef.current ?? 0;
+    }
+  }, []);
+
+  const resetScale = useCallback(() => {
+    setUserScale(1);
+    userScaleRef.current = 1;
+    if (sofaRef.current && sourceBoundsRef.current) {
+      // Rescale sofa inside the pivot; re-normalise local Y so legs stay at Y=0
+      scaleSofa(sofaRef.current, sourceBoundsRef.current, 1);
+      sofaRef.current.updateMatrixWorld(true);
+      const b = new THREE.Box3().setFromObject(sofaRef.current);
+      sofaRef.current.position.y -= b.min.y;
+      if (floorShadowRef.current) {
+        floorShadowRef.current.scale.set(1, 1, 1);
+      }
+    }
+  }, []);
+
+  const startReposition = useCallback(() => {
+    setPlaced(false);
+    placedRef.current = false;
+    anchorRef.current?.delete();
+    anchorRef.current = null;
+    if (pivotRef.current) pivotRef.current.visible = false;
+    if (floorShadowRef.current) floorShadowRef.current.visible = false;
+  }, []);
+
+  const rotateSofa = useCallback((amount: number) => {
+    if (!pivotRef.current) return;
+    rotationRef.current += amount;
+    // Rotate the pivot — sofa stays inside, legs stay on floor
+    pivotRef.current.rotation.y = rotationRef.current;
+  }, []);
+
   const moveSofaOnFloor = useCallback((fromX: number, fromY: number, toX: number, toY: number) => {
-    const sofa = sofaRef.current;
+    const pivot = pivotRef.current;
     const xrCamera = rendererRef.current?.xr.getCamera();
     const camera = xrCamera?.cameras[0] ?? xrCamera;
-    if (!sofa || !camera || !placementRef.current) return;
+    if (!pivot || !camera || !placementRef.current) return;
     const rect = rendererRef.current?.domElement.getBoundingClientRect();
     if (!rect || rect.width === 0 || rect.height === 0) return;
 
+    const floorY = floorYRef.current ?? placementRef.current.y;
     const projectToFloor = (x: number, y: number) => {
       const ndc = new THREE.Vector2(
         ((x - rect.left) / rect.width) * 2 - 1,
@@ -312,7 +385,7 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
       raycaster.setFromCamera(ndc, camera);
       const directionY = raycaster.ray.direction.y;
       if (Math.abs(directionY) < 0.0001) return null;
-      const distance = (placementRef.current!.y - raycaster.ray.origin.y) / directionY;
+      const distance = (floorY - raycaster.ray.origin.y) / directionY;
       if (distance <= 0) return null;
       return raycaster.ray.at(distance, new THREE.Vector3());
     };
@@ -321,16 +394,16 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
     if (!previousPoint || !currentPoint) return;
     const delta = currentPoint.sub(previousPoint);
     delta.y = 0;
+    // Accumulate into manualOffset only — pivot.position is set from this each render frame
     manualOffsetRef.current.add(delta);
     placementRef.current.add(delta);
-    alignToFloor(sofa, placementRef.current);
-  }, []);
-
-  const rotateSofa = useCallback((amount: number) => {
-    if (!sofaRef.current || !placementRef.current) return;
-    rotationRef.current += amount;
-    sofaRef.current.rotation.y = rotationRef.current;
-    alignToFloor(sofaRef.current, placementRef.current);
+    if (floorShadowRef.current) {
+      floorShadowRef.current.position.set(
+        placementRef.current.x,
+        floorY - 0.002,
+        placementRef.current.z,
+      );
+    }
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
@@ -372,6 +445,21 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
           return;
         }
 
+        // Two-finger vertical swipe → Adjust elevation (Y axis via pivot.position.y)
+        const deltaY = y - previous.y;
+        if (Math.abs(deltaY) > 0.5) {
+          const nextElevation = THREE.MathUtils.clamp(
+            elevationRef.current - deltaY * 0.0015,
+            -0.4,
+            0.6,
+          );
+          elevationRef.current = nextElevation;
+          if (pivotRef.current) {
+            pivotRef.current.position.y = (floorYRef.current ?? 0) + nextElevation;
+          }
+          setElevation(nextElevation);
+        }
+
         moveSofaOnFloor(previous.x, previous.y, x, y);
 
         const rotationDelta = Math.atan2(
@@ -380,7 +468,7 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
         );
         rotateSofa(rotationDelta);
 
-        if (previous.distance > 0 && sourceBoundsRef.current && placementRef.current) {
+        if (previous.distance > 0 && sourceBoundsRef.current && sofaRef.current) {
           const newScale = THREE.MathUtils.clamp(
             userScaleRef.current * (distance / previous.distance),
             0.3,
@@ -388,8 +476,14 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
           );
           userScaleRef.current = newScale;
           scaleSofa(sofaRef.current, sourceBoundsRef.current, newScale);
-          alignToFloor(sofaRef.current, placementRef.current);
+          // Re-normalise: keep legs at local Y=0 inside pivot after scale change
+          sofaRef.current.updateMatrixWorld(true);
+          const b = new THREE.Box3().setFromObject(sofaRef.current);
+          sofaRef.current.position.y -= b.min.y;
           setUserScale(newScale);
+          if (floorShadowRef.current) {
+            floorShadowRef.current.scale.set(newScale, newScale, newScale);
+          }
         }
         touchGestureRef.current = { type: "transform", x, y, distance, angle };
       } else if (e.touches.length === 1 && placedRef.current) {
@@ -482,14 +576,35 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
     threeScene.add(reticle);
     reticleRef.current = reticle;
 
+    // ── Pivot pattern (ARCore / SceneViewer industry standard) ────────────────
+    // A pivot Group sits exactly at the detected floor plane (Y = floor.y).
+    // The sofa is added INSIDE the pivot with its feet at local Y = 0.
+    // In the render loop we only ever touch pivot.position – the sofa stays put.
+    const pivot = new THREE.Group();
+    pivot.visible = false;
+    threeScene.add(pivot);
+    pivotRef.current = pivot;
+
     // load sofa
     new GLTFLoader().load("/Panache-OPAA-optimized.glb", (gltf) => {
       const sofa = gltf.scene;
       sofaRef.current = sofa;
-      sourceBoundsRef.current = new THREE.Box3().setFromObject(sofa);
-      scaleSofa(sofa, sourceBoundsRef.current, 1);
-      sofa.visible = false;
-      threeScene.add(sofa);
+
+      // 1. Measure raw bounds before any scaling
+      const rawBounds = new THREE.Box3().setFromObject(sofa);
+      sourceBoundsRef.current = rawBounds;
+
+      // 2. Scale to target real-world dimensions
+      scaleSofa(sofa, rawBounds, 1);
+
+      // 3. Normalise: shift sofa inside pivot so its lowest vertex is at local Y=0
+      //    (this is what ARCore SceneViewer does automatically)
+      sofa.updateMatrixWorld(true);
+      const scaledBounds = new THREE.Box3().setFromObject(sofa);
+      sofa.position.y -= scaledBounds.min.y;   // legs now sit at Y = 0 in pivot space
+
+      pivot.add(sofa);
+
       const mats = buildMaterials("oat", "oak");
       matRef.current = mats;
       applyMaterials(sofa, mats.upholstery, mats.feet);
@@ -516,11 +631,13 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
         if (!frame) return;
         // refSpace must be read inside the loop — it's only valid after setSession
         const refSpace = renderer.xr.getReferenceSpace();
+
+        // ── Before placement: show reticle on upward floor surfaces only ──────
         if (hitSrcRef.current && reticleRef.current && !placedRef.current && refSpace) {
           const hits = (frame as XRFrame).getHitTestResults(hitSrcRef.current);
           const floorHit = hits
             .map((hit) => ({ hit, pose: hit.getPose(refSpace as XRSpace) }))
-            .find(({ pose }) => pose && isFloorSurfaceTransform(pose.transform.matrix, 0, 0.35));
+            .find(({ pose }) => pose && isFloorSurfaceTransform(pose.transform.matrix));
           if (floorHit?.pose) {
             latestHitRef.current = floorHit.hit;
             reticleRef.current.visible = true;
@@ -531,23 +648,35 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
             reticleRef.current.visible = false;
           }
         }
-        if (placedRef.current && anchorRef.current && refSpace) {
-          const pose = (frame as XRFrame).getPose(anchorRef.current.anchorSpace, refSpace);
-          if (pose) {
-            const anchorPosition = new THREE.Vector3(
-              pose.transform.position.x + manualOffsetRef.current.x,
-              floorYRef.current ?? pose.transform.position.y,
-              pose.transform.position.z + manualOffsetRef.current.z,
-            );
-            placementRef.current = anchorPosition;
-            if (sofaRef.current) alignToFloor(sofaRef.current, anchorPosition);
-            floorShadowRef.current?.position.set(
-              anchorPosition.x,
-              (floorYRef.current ?? anchorPosition.y) - 0.002,
-              anchorPosition.z,
-            );
+
+        // ── After placement: pivot.position = floor hit + manual offsets ──────
+        // The pivot sits exactly at floor.y – the sofa's feet are at pivot local Y=0,
+        // so the sofa is guaranteed on the floor with zero per-frame drift.
+        if (placedRef.current && pivotRef.current) {
+          const floorY = floorYRef.current ?? 0;
+          const offset = manualOffsetRef.current;
+          const px = (placementRef.current?.x ?? 0) + offset.x;
+          const pz = (placementRef.current?.z ?? 0) + offset.z;
+          const py = floorY + elevationRef.current;
+
+          // Anchor: update XZ from anchor pose if available (drift correction)
+          if (anchorRef.current && refSpace) {
+            const pose = (frame as XRFrame).getPose(anchorRef.current.anchorSpace, refSpace);
+            if (pose) {
+              const ax = pose.transform.position.x + offset.x;
+              const az = pose.transform.position.z + offset.z;
+              pivotRef.current.position.set(ax, py, az);
+              floorShadowRef.current?.position.set(ax, floorY - 0.002, az);
+            } else {
+              pivotRef.current.position.set(px, py, pz);
+              floorShadowRef.current?.position.set(px, floorY - 0.002, pz);
+            }
+          } else {
+            pivotRef.current.position.set(px, py, pz);
+            floorShadowRef.current?.position.set(px, floorY - 0.002, pz);
           }
         }
+
         renderer.render(threeScene, renderer.xr.getCamera());
       });
 
@@ -586,13 +715,39 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
   const handleTap = useCallback((e: React.MouseEvent) => {
     // ignore taps on the UI panel
     if ((e.target as HTMLElement).closest("[data-ar-ui]")) return;
-    if (placedRef.current || !reticleRef.current?.visible || !sofaRef.current) return;
-    // place sofa at reticle position, floor-aligned
+
+    if (placedRef.current) {
+      const now = performance.now();
+      if (now - lastTapTimeRef.current < 320) {
+        // Double-tap detected: snap elevation to floor and scale to 100%
+        resetElevation();
+        resetScale();
+        lastTapTimeRef.current = 0;
+        return;
+      }
+      lastTapTimeRef.current = now;
+      return;
+    }
+
+    if (!reticleRef.current?.visible || !pivotRef.current || !sofaRef.current) return;
+
+    // Extract the hit position from the reticle matrix
     const pos = new THREE.Vector3();
     const quat = new THREE.Quaternion();
     const scl = new THREE.Vector3();
     reticleRef.current.matrix.decompose(pos, quat, scl);
-    sofaRef.current.position.set(pos.x, pos.y, pos.z);
+
+    // Store the detected floor Y — this is the authoritative floor height
+    floorYRef.current = pos.y;
+    // Reset any manual XZ drift
+    manualOffsetRef.current.set(0, 0, 0);
+    // placementRef holds the XZ anchor position (Y comes from floorYRef each frame)
+    placementRef.current = new THREE.Vector3(pos.x, pos.y, pos.z);
+
+    // Place the pivot at the exact hit position: legs land flush on the real floor
+    pivotRef.current.position.set(pos.x, pos.y + elevationRef.current, pos.z);
+
+    // Face the sofa toward the user (rotate pivot, not the sofa itself)
     const camera = rendererRef.current?.xr.getCamera();
     if (camera) {
       const gaze = camera.getWorldDirection(new THREE.Vector3());
@@ -604,14 +759,11 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
         facingZ = cameraPosition.z - pos.z;
       }
       if (Math.hypot(facingX, facingZ) > 0.001) {
-        sofaRef.current.rotation.y = Math.atan2(facingX, facingZ);
+        pivotRef.current.rotation.y = Math.atan2(facingX, facingZ);
       }
     }
-    rotationRef.current = sofaRef.current.rotation.y;
-    floorYRef.current = pos.y;
-    manualOffsetRef.current.set(0, 0, 0);
-    placementRef.current = pos.clone();
-    alignToFloor(sofaRef.current, placementRef.current);
+    rotationRef.current = pivotRef.current.rotation.y;
+
     const hit = latestHitRef.current;
     if (hit?.createAnchor) {
       void hit
@@ -625,21 +777,20 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
           anchorRef.current = anchor;
         })
         .catch((error: unknown) => {
-          console.error("Could not anchor AR sofa to detected surface:", error);
+          console.warn("Could not anchor AR sofa to detected surface:", error);
         });
     }
     latestHitRef.current = null;
     if (floorShadowRef.current) {
       floorShadowRef.current.position.set(pos.x, pos.y - 0.002, pos.z);
+      floorShadowRef.current.scale.set(userScaleRef.current, userScaleRef.current, userScaleRef.current);
       floorShadowRef.current.visible = true;
     }
-    sofaRef.current.visible = true;
+    pivotRef.current.visible = true;
     reticleRef.current.visible = false;
     placedRef.current = true;
     setPlaced(true);
-    hitSrcRef.current?.cancel();
-    hitSrcRef.current = null;
-  }, []);
+  }, [resetElevation, resetScale]);
 
   const exitAR = useCallback(() => {
     void session.end().catch(() => {});
@@ -659,14 +810,27 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
       {/* top bar */}
       <div
         data-ar-ui
-        className="pointer-events-auto absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-black/50 px-4 py-3"
+        className="pointer-events-auto absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-black/60 px-4 py-3 backdrop-blur-sm"
       >
-        <span className="text-xs font-semibold text-white">
-          {placed ? "Panache · 2 seater" : "Point at floor · tap to place"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-white">
+            {placed ? "Panache · 2 seater" : "Point at floor · tap to place"}
+          </span>
+          {placed && (
+            <button
+              onClick={startReposition}
+              className="flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/90 active:bg-white/20"
+              title="Move sofa with camera"
+            >
+              <Move className="size-3 text-white/70" />
+              <span>Move with Camera</span>
+            </button>
+          )}
+        </div>
         <button
           onClick={exitAR}
-          className="flex size-8 items-center justify-center rounded-full bg-white/20"
+          className="flex size-8 items-center justify-center rounded-full bg-white/20 active:bg-white/30"
+          title="Exit AR"
         >
           <X className="size-4 text-white" />
         </button>
@@ -675,118 +839,143 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
       {placed && (
         <div
           data-ar-ui
-          className="pointer-events-auto absolute inset-x-0 bottom-0 z-10 space-y-2 bg-black/65 px-4 pb-8 pt-3"
+          className="pointer-events-auto absolute inset-x-0 bottom-0 z-10 space-y-2.5 bg-black/75 px-4 pb-7 pt-3 backdrop-blur-md"
         >
-          {/* live price */}
-          <div className="flex items-center justify-between pb-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-white/50">
-              Total
-            </span>
-            <span className="font-display text-lg font-semibold text-white">{price}</span>
-          </div>
-          <p className="text-center text-[11px] text-white/75">
-            Dimensions · W {(seatingWidth(2) * userScale * 100).toFixed(1)} × D{" "}
-            {(BASE_SIZE.depth * userScale * 100).toFixed(1)} × H{" "}
-            {(BASE_SIZE.height * userScale * 100).toFixed(1)} cm
-          </p>
-          {/* fabric */}
-          <div className="relative" style={{ touchAction: "pan-y" }}>
-            <button
-              className="flex w-full items-center justify-between rounded-lg border border-white/20 bg-white/10 px-3 py-2.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                setFabricOpen((v) => !v);
-                setLegOpen(false);
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className="size-4 rounded-sm border border-white/30"
-                  style={{ background: selectedFabric.color || "#b8aa91" }}
-                />
-                <span className="text-xs font-medium text-white">{selectedFabric.name}</span>
+          {/* live price & dimensions */}
+          <div className="flex items-center justify-between border-b border-white/10 pb-2">
+            <div>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-white/50">
+                Total (2-Seater)
+              </span>
+              <div className="font-display text-lg font-semibold text-white">{price}</div>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-white/50">Dimensions</span>
+              <div className="font-mono text-xs text-white/80">
+                {(seatingWidth(2) * userScale * 100).toFixed(0)} ×{" "}
+                {(BASE_SIZE.depth * userScale * 100).toFixed(0)} ×{" "}
+                {(BASE_SIZE.height * userScale * 100).toFixed(0)} cm
               </div>
-              <ChevronDown
-                className={cn(
-                  "size-3.5 text-white/60 transition-transform",
-                  fabricOpen && "rotate-180",
-                )}
-              />
-            </button>
-            {fabricOpen && (
-              <div className="absolute bottom-full mb-1 max-h-56 w-full overflow-y-auto rounded-lg border border-white/20 bg-black/95">
-                {AR_FABRICS.map((f) => (
-                  <button
-                    key={f.id}
-                    className="flex w-full items-center gap-2.5 px-3 py-2.5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFabric(f.id);
-                      setFabricOpen(false);
-                    }}
-                  >
-                    <span
-                      className="size-4 shrink-0 rounded-sm border border-white/20"
-                      style={{ background: f.color || "#b8aa91" }}
-                    />
-                    <span className="flex-1 text-left text-xs text-white">{f.name}</span>
-                    {fabric === f.id && <Check className="size-3 text-white/50" />}
-                  </button>
-                ))}
-              </div>
-            )}
+            </div>
           </div>
 
-          {/* leg */}
-          <div className="relative" style={{ touchAction: "pan-y" }}>
-            <button
-              className="flex w-full items-center justify-between rounded-lg border border-white/20 bg-white/10 px-3 py-2.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                setLegOpen((v) => !v);
-                setFabricOpen(false);
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className="size-4 rounded-sm border border-white/30"
-                  style={{ background: selectedLeg.color }}
-                />
-                <span className="text-xs font-medium text-white">{selectedLeg.name}</span>
-              </div>
-              <ChevronDown
-                className={cn(
-                  "size-3.5 text-white/60 transition-transform",
-                  legOpen && "rotate-180",
-                )}
-              />
-            </button>
-            {legOpen && (
-              <div className="absolute bottom-full mb-1 w-full overflow-hidden rounded-lg border border-white/20 bg-black/95">
-                {AR_LEGS.map((l) => (
-                  <button
-                    key={l.id}
-                    className="flex w-full items-center gap-2.5 px-3 py-2.5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setLeg(l.id);
-                      setLegOpen(false);
-                    }}
-                  >
-                    <span
-                      className="size-4 shrink-0 rounded-sm border border-white/20"
-                      style={{ background: l.color }}
-                    />
-                    <span className="flex-1 text-left text-xs text-white">{l.name}</span>
-                    {leg === l.id && <Check className="size-3 text-white/50" />}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Touch Gesture Guide */}
+          <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-white/70">
+            <div className="flex items-center gap-1.5">
+              <span className="text-white/40">1-finger:</span>
+              <span>Move on floor</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-white/40">2-finger swipe:</span>
+              <span>Height</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-white/40">Pinch/Twist:</span>
+              <span>Scale & Turn</span>
+            </div>
           </div>
 
-          <p className="text-center text-[10px] text-white/50">
-            One finger: move on floor · two fingers: move, twist to rotate, pinch to resize
+          {/* Fabric & Leg Selectors */}
+          <div className="grid grid-cols-2 gap-2">
+            {/* Fabric */}
+            <div className="relative" style={{ touchAction: "pan-y" }}>
+              <button
+                className="flex w-full items-center justify-between rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-left"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFabricOpen((v) => !v);
+                  setLegOpen(false);
+                }}
+              >
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span
+                    className="size-3.5 shrink-0 rounded-sm border border-white/30"
+                    style={{ background: selectedFabric.color || "#b8aa91" }}
+                  />
+                  <span className="truncate text-xs font-medium text-white">{selectedFabric.name}</span>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    "size-3 shrink-0 text-white/60 transition-transform",
+                    fabricOpen && "rotate-180",
+                  )}
+                />
+              </button>
+              {fabricOpen && (
+                <div className="absolute bottom-full mb-1 max-h-56 w-full overflow-y-auto rounded-lg border border-white/20 bg-black/95 shadow-xl">
+                  {AR_FABRICS.map((f) => (
+                    <button
+                      key={f.id}
+                      className="flex w-full items-center gap-2 px-2.5 py-2 text-left active:bg-white/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFabric(f.id);
+                        setFabricOpen(false);
+                      }}
+                    >
+                      <span
+                        className="size-3 shrink-0 rounded-sm border border-white/20"
+                        style={{ background: f.color || "#b8aa91" }}
+                      />
+                      <span className="flex-1 truncate text-xs text-white">{f.name}</span>
+                      {fabric === f.id && <Check className="size-3 text-white/50" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Leg finish */}
+            <div className="relative" style={{ touchAction: "pan-y" }}>
+              <button
+                className="flex w-full items-center justify-between rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-left"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLegOpen((v) => !v);
+                  setFabricOpen(false);
+                }}
+              >
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span
+                    className="size-3.5 shrink-0 rounded-sm border border-white/30"
+                    style={{ background: selectedLeg.color }}
+                  />
+                  <span className="truncate text-xs font-medium text-white">{selectedLeg.name}</span>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    "size-3 shrink-0 text-white/60 transition-transform",
+                    legOpen && "rotate-180",
+                  )}
+                />
+              </button>
+              {legOpen && (
+                <div className="absolute bottom-full mb-1 w-full overflow-hidden rounded-lg border border-white/20 bg-black/95 shadow-xl">
+                  {AR_LEGS.map((l) => (
+                    <button
+                      key={l.id}
+                      className="flex w-full items-center gap-2 px-2.5 py-2 text-left active:bg-white/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLeg(l.id);
+                        setLegOpen(false);
+                      }}
+                    >
+                      <span
+                        className="size-3 shrink-0 rounded-sm border border-white/20"
+                        style={{ background: l.color }}
+                      />
+                      <span className="flex-1 truncate text-xs text-white">{l.name}</span>
+                      {leg === l.id && <Check className="size-3 text-white/50" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <p className="text-center text-[10px] text-white/45">
+            1 finger: drag across floor · 2 fingers: pinch scale &amp; twist turn
           </p>
         </div>
       )}
@@ -797,6 +986,11 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
 // ─── AR launch screen (phone opens ?ar=1) ─────────────────────────────────────
 
 export function ARLaunchScreen() {
+  const searchParams =
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const initialFabric = (searchParams?.get("fabric") as FabricId) || "oat";
+  const initialLeg = (searchParams?.get("leg") as LegId) || "oak";
+
   const [arSupported, setArSupported] = useState<boolean | null>(null);
   const [session, setSession] = useState<XRSession | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -851,7 +1045,14 @@ export function ARLaunchScreen() {
 
   // Once session is live, render the overlay on top of the camera feed
   if (session) {
-    return <AROverlay session={session} onEnd={handleEnd} />;
+    return (
+      <AROverlay
+        session={session}
+        onEnd={handleEnd}
+        initialFabric={initialFabric}
+        initialLeg={initialLeg}
+      />
+    );
   }
 
   return (
@@ -879,10 +1080,20 @@ export function ARLaunchScreen() {
         <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-5 text-center">
           <p className="text-sm font-semibold text-white">AR not available</p>
           {!window.isSecureContext && (
-            <p className="mt-2 text-xs text-amber-400">
-              Page is not secure (HTTP). In Chrome, go to chrome://flags and enable “Unsafely treat
-              insecure origin as secure” for http://192.168.1.9:3000
-            </p>
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-amber-400">
+                Camera access requires a secure connection (HTTPS).
+              </p>
+              <a
+                href={`https://${window.location.host}${window.location.pathname}${window.location.search}`}
+                className="inline-block rounded-lg bg-white px-4 py-2 text-xs font-semibold text-black active:bg-white/80"
+              >
+                Open over HTTPS
+              </a>
+              <p className="text-[10px] text-white/50">
+                (If Chrome warns about certificate on local Wi-Fi, tap <em>Advanced &rarr; Proceed</em>)
+              </p>
+            </div>
           )}
           {window.isSecureContext && (
             <p className="mt-2 text-xs text-white/50">
@@ -923,9 +1134,11 @@ export function ARLaunchScreen() {
 
 interface ARButtonProps {
   seats: number;
+  fabric?: FabricId;
+  leg?: LegId;
 }
 
-export function ARButton({ seats }: ARButtonProps) {
+export function ARButton({ seats, fabric = "oat", leg = "oak" }: ARButtonProps) {
   const [showQR, setShowQR] = useState(false);
   const [session, setSession] = useState<XRSession | null>(null);
   const [arReady, setArReady] = useState(false);
@@ -972,9 +1185,16 @@ export function ARButton({ seats }: ARButtonProps) {
         View in AR
       </button>
 
-      {showQR && <QRModal onClose={() => setShowQR(false)} />}
+      {showQR && <QRModal onClose={() => setShowQR(false)} fabric={fabric} leg={leg} />}
 
-      {session && <AROverlay session={session} onEnd={() => setSession(null)} />}
+      {session && (
+        <AROverlay
+          session={session}
+          onEnd={() => setSession(null)}
+          initialFabric={fabric}
+          initialLeg={leg}
+        />
+      )}
     </>
   );
 }

@@ -1260,7 +1260,7 @@ export function SofaConfigurator() {
         </div>
         <div className="hidden text-center md:block"><div className="text-xs font-semibold">Panache OPAA · {seats} seater</div><div className="mt-1 text-[10px] text-muted-foreground">{selectedFabric.name} · {selectedLeg.name}</div></div>
         <div className="pointer-events-auto flex items-center gap-2">
-          <ARButton seats={seats} />
+          <ARButton seats={seats} fabric={fabric} leg={leg} />
           <Button variant="outline" size="icon-sm" onClick={screenshot} aria-label="Download image" title="Download image"><Download className="size-4" /></Button>
           <Button variant="outline" size="icon-sm" onClick={fullscreen} aria-label="Fullscreen" title="Fullscreen"><Expand className="size-4" /></Button>
         </div>

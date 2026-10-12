@@ -257,25 +257,43 @@ export function projectSurface(
 
 export function isFloorSurfaceTransform(
   transform: ArrayLike<number>,
-  floorY = 0,
+  floorY?: number,
   heightTolerance = 0.35,
 ) {
   const matrix = new THREE.Matrix4().fromArray(transform);
   const orientation = new THREE.Quaternion();
   matrix.decompose(new THREE.Vector3(), orientation, new THREE.Vector3());
-  return (
-    new THREE.Vector3(0, 1, 0).applyQuaternion(orientation).y >= 0.85 &&
-    Math.abs(matrix.elements[13]! - floorY) <= heightTolerance
-  );
+  const isUpward = new THREE.Vector3(0, 1, 0).applyQuaternion(orientation).y >= 0.75;
+  if (!isUpward) return false;
+  if (floorY !== undefined) {
+    return Math.abs(matrix.elements[13]! - floorY) <= heightTolerance;
+  }
+  return true;
 }
 
-export function alignToFloor(scene: THREE.Group, floor: THREE.Vector3) {
+/**
+ * Ground `scene` so its lowest world-space vertex lands at `floor.y + elevationOffset`.
+ *
+ * Industry-standard approach used by ARCore / SceneViewer:
+ *   1. Read the world-space bounding box of the mesh (after scale is applied).
+ *   2. Calculate how much Y needs to shift so bounds.min.y == floor.y + elevation.
+ *   3. Apply that shift as an absolute value – never accumulate deltas.
+ *
+ * X and Z are set directly to the hit-test world position so the sofa is
+ * centred on the floor tap, matching the ARCore "place at reticle" behaviour.
+ */
+export function alignToFloor(scene: THREE.Group, floor: THREE.Vector3, elevationOffset = 0) {
+  // Step 1 – find where the model's bottom currently sits in world space.
   scene.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(scene);
-  const center = bounds.getCenter(new THREE.Vector3());
-  scene.position.x += floor.x - center.x;
-  scene.position.y += floor.y - bounds.min.y;
-  scene.position.z += floor.z - center.z;
+
+  // Step 2 – how much to shift Y so that bounds.min.y == floor.y + elevation.
+  const yShift = floor.y + elevationOffset - bounds.min.y;
+
+  // Step 3 – apply absolute, never-accumulating position.
+  scene.position.x = floor.x;
+  scene.position.y = scene.position.y + yShift; // shift relative to current pivot
+  scene.position.z = floor.z;
 }
 
 export function splitSofaGeometry(source: THREE.BufferGeometry) {
