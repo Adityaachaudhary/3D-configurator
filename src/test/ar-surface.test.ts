@@ -5,6 +5,7 @@ import {
   alignToFloor,
   isFloorSurfaceTransform,
   projectSurface,
+  screenDragToWorldDelta,
   splitSofaGeometry,
 } from "@/lib/ar-surface";
 import { splitARIndices } from "@/lib/ar-geometry";
@@ -27,6 +28,19 @@ describe("AR sofa geometry", () => {
     mesh.geometry.dispose();
   });
 
+  it("maps one-finger screen movement to horizontal travel and vertical lift", () => {
+    const right = new THREE.Vector3(1, 0, 0);
+    const rightDrag = screenDragToWorldDelta(20, 0, 0.01, right);
+    const upDrag = screenDragToWorldDelta(0, -20, 0.01, right);
+
+    expect(rightDrag.x).toBeCloseTo(0.2);
+    expect(rightDrag.y).toBeCloseTo(0);
+    expect(rightDrag.z).toBeCloseTo(0);
+    expect(upDrag.x).toBeCloseTo(0);
+    expect(upDrag.y).toBeCloseTo(0.2);
+    expect(upDrag.z).toBe(0);
+  });
+
   it("only offers upward-facing horizontal surfaces for floor placement", () => {
     expect(isFloorSurfaceTransform(new THREE.Matrix4().elements)).toBe(true);
     expect(isFloorSurfaceTransform(new THREE.Matrix4().makeRotationX(Math.PI / 2).elements)).toBe(
@@ -37,6 +51,9 @@ describe("AR sofa geometry", () => {
     );
     expect(
       isFloorSurfaceTransform(new THREE.Matrix4().makeTranslation(0, 0.8, 0).elements, 0, 0.35),
+    ).toBe(false);
+    expect(
+      isFloorSurfaceTransform(new THREE.Matrix4().makeTranslation(0, 0.2, 0).elements, 0, 0.12),
     ).toBe(false);
   });
 

@@ -18,6 +18,7 @@ import {
   createSurfaceMaps,
   isFloorSurfaceTransform,
   projectSurface,
+  screenDragToWorldDelta,
   splitSofaGeometryAsync,
 } from "@/lib/ar-surface";
 import { DEFAULT_TILE_CM, tileDensity } from "@/lib/texture-repeat";
@@ -41,6 +42,7 @@ export type FabricId =
   | "chesterfield-saddle";
 
 export type LegId = "oak" | "walnut" | "ebonized" | "steel";
+const FLOOR_HIT_TOLERANCE = 0.12;
 
 type FabricPreset = {
   id: FabricId;
@@ -330,6 +332,36 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
     alignToFloor(sofa, placementRef.current);
   }, []);
 
+  const moveSofaWithOneFinger = useCallback((deltaX: number, deltaY: number) => {
+    const sofa = sofaRef.current;
+    const renderer = rendererRef.current;
+    const xrCamera = renderer?.xr.getCamera();
+    const camera = xrCamera?.cameras[0] ?? xrCamera;
+    const placement = placementRef.current;
+    if (!sofa || !renderer || !camera || !placement) return;
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (rect.height === 0) return;
+
+    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+    const distance = Math.max(0.1, cameraPosition.distanceTo(placement));
+    const projectionScale = camera.projectionMatrix.elements[5] ?? 1;
+    const unitsPerPixel = (2 * distance) / (rect.height * projectionScale);
+    const cameraRight = new THREE.Vector3(1, 0, 0)
+      .applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
+    cameraRight.y = 0;
+    if (cameraRight.lengthSq() < 0.0001) return;
+    cameraRight.normalize();
+
+    const delta = screenDragToWorldDelta(deltaX, deltaY, unitsPerPixel, cameraRight);
+    const nextHeightOffset = Math.max(0, manualOffsetRef.current.y + delta.y);
+    delta.y = nextHeightOffset - manualOffsetRef.current.y;
+
+    manualOffsetRef.current.add(delta);
+    placement.add(delta);
+    alignToFloor(sofa, placement);
+  }, []);
+
   const rotateSofa = useCallback((amount: number) => {
     if (!sofaRef.current || !placementRef.current) return;
     rotationRef.current += amount;
@@ -403,11 +435,11 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
           touchGestureRef.current = { type: "drag", x: touch.clientX, y: touch.clientY };
           return;
         }
-        moveSofaOnFloor(previous.x, previous.y, touch.clientX, touch.clientY);
+        moveSofaWithOneFinger(touch.clientX - previous.x, touch.clientY - previous.y);
         touchGestureRef.current = { type: "drag", x: touch.clientX, y: touch.clientY };
       }
     },
-    [moveSofaOnFloor, rotateSofa],
+    [moveSofaOnFloor, moveSofaWithOneFinger, rotateSofa],
   );
 
   const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
@@ -552,10 +584,23 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
         // refSpace must be read inside the loop — it's only valid after setSession
         const refSpace = renderer.xr.getReferenceSpace();
         if (hitSrcRef.current && reticleRef.current && !placedRef.current && refSpace) {
-          const hits = (frame as XRFrame).getHitTestResults(hitSrcRef.current);
-          const floorHit = hits
+          const floorHit = (frame as XRFrame)
+            .getHitTestResults(hitSrcRef.current)
             .map((hit) => ({ hit, pose: hit.getPose(refSpace as XRSpace) }))
-            .find(({ pose }) => pose && isFloorSurfaceTransform(pose.transform.matrix, 0, 0.35));
+            .filter(
+              ({ pose }) =>
+                pose &&
+                isFloorSurfaceTransform(
+                  pose.transform.matrix,
+                  0,
+                  FLOOR_HIT_TOLERANCE,
+                ),
+            )
+            .sort(
+              (a, b) =>
+                Math.abs(a.pose!.transform.position.y) -
+                Math.abs(b.pose!.transform.position.y),
+            )[0];
           if (floorHit?.pose) {
             latestHitRef.current = floorHit.hit;
             reticleRef.current.visible = true;
@@ -571,7 +616,7 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
           if (pose) {
             const anchorPosition = new THREE.Vector3(
               pose.transform.position.x + manualOffsetRef.current.x,
-              floorYRef.current ?? pose.transform.position.y,
+              (floorYRef.current ?? pose.transform.position.y) + manualOffsetRef.current.y,
               pose.transform.position.z + manualOffsetRef.current.z,
             );
             placementRef.current = anchorPosition;
@@ -837,7 +882,8 @@ function AROverlay({ session, onEnd }: AROverlayProps) {
           </div>
 
           <p className="text-center text-[10px] text-white/50">
-            One finger: move on floor · two fingers: move, twist to rotate, pinch to resize
+            One finger: drag sideways to move, up/down to lift or lower · two fingers: move, twist,
+            pinch to resize
           </p>
         </div>
       )}

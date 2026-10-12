@@ -278,6 +278,19 @@ export function alignToFloor(scene: THREE.Group, floor: THREE.Vector3) {
   scene.position.z += floor.z - center.z;
 }
 
+export function screenDragToWorldDelta(
+  deltaX: number,
+  deltaY: number,
+  unitsPerPixel: number,
+  cameraRight: THREE.Vector3,
+) {
+  return new THREE.Vector3(
+    cameraRight.x * deltaX * unitsPerPixel,
+    -deltaY * unitsPerPixel,
+    cameraRight.z * deltaX * unitsPerPixel,
+  );
+}
+
 export function splitSofaGeometry(source: THREE.BufferGeometry) {
   const geometry = source.clone();
   const position = geometry.getAttribute("position");
